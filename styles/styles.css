@@ -1,0 +1,87 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+.board {
+    background-repeat: no-repeat;
+    background-size: cover;
+    border-radius: 3px;
+    position: relative;
+    width: 400px; /* Set the size of the board */
+    height: 400px;
+    background-image: url('https://assets-themes.chess.com/image/9rdwe/200.png');
+    
+    /* Ensure the center of the board is at the center of the screen */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+
+.piece {
+    background-size: 100%;
+    cursor: grab;
+    position: absolute;
+    width: 12.5%;  /* 12.5 = 100/8 */
+    height: 12.5%;
+}
+
+
+.bp {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bp.png');
+}
+
+.br {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/br.png');
+}
+
+.bn {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bn.png');
+}
+
+.bb {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bb.png');
+}
+
+.bk {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bk.png');
+}
+
+.bq {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bq.png');
+}
+
+
+.wp {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wp.png');
+}
+
+.wr {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wr.png');
+}
+
+.wn {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wn.png');
+}
+
+.wb {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wb.png');
+}
+
+.wk {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wk.png');
+}
+
+.wq {
+    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wq.png');
+}
+
+.square-22 {
+  transform:translate(100%,600%)
+}
