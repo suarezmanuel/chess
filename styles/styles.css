@@ -23,15 +23,45 @@ html, body {
     transform: translate(-50%, -50%);
 }
 
+.highlight {
+    position: absolute;
+    background-color: rgba(255, 255, 51, 0.5); /* Semi-transparent yellow */
+    pointer-events: none; /* Allow interactions with underlying elements */
+    z-index: 1; /* Ensure highlights are behind the pieces */
+    width: 12.5%; /* Each square is 1/8th of the board width */
+    height: 12.5%; /* Each square is 1/8th of the board height */
+}
 
 .piece {
     background-size: 100%;
-    cursor: grab;
+    cursor: default;
     position: absolute;
     width: 12.5%;  /* 12.5 = 100/8 */
     height: 12.5%;
+    z-index: 2;
 }
 
+.piece.draggable {
+    cursor: grab;
+}
+
+.hint {
+    background-color: var(--color-transparent-black-14);
+    padding: 4.2%;
+}
+.capture-hint, .hint {
+    background-clip: content-box;
+    border-radius: 50%;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.capture-hint, .highlight, .hint {
+    height: 12.5%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 12.5%;
+}
 
 .bp {
     background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bp.png');
@@ -80,8 +110,4 @@ html, body {
 
 .wq {
     background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wq.png');
-}
-
-.square-22 {
-  transform:translate(100%,600%)
 }
