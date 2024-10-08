@@ -1,193 +1,190 @@
-// Helper function to check if a move is valid
-export function isValidMove(boardArray, piece, startX, startY, targetX, targetY) {
+// up right down left
+let rookDirections = [[0,-1], [1,0], [0,1], [-1,0]];
+// up-right bottom-right bottom-left up-left
+let bishopDirections = [[1,-1], [1,1], [-1,1], [-1,-1]];
+// clock wise starting from up 
+let knightDirections = [[1,-2], [2,-1], [2,1], [1,2], [-1,2], [-2,1], [-2,-1], [-1,-2]];
+let kingDirections = [[0,-1], [1,0], [0,1], [-1,0], [1,-1], [1,1], [-1,1], [-1,-1]];
+
+let validWhiteMoves = [];
+let validBlackMoves = [];
+
+export function getValidMovesWhite() {
+
+}
+
+export function getValidMovesBlack() {
+
+}
+
+export function getValidMoves (board, piece, xPos, yPos, onCheck) {
+
     const pieceType = piece.substring(1); // e.g., 'p' for pawn, 'r' for rook, etc.
+    let moves = [];
+    // need to account for taking pieces
     switch (pieceType) {
         case 'p': // Pawn move (basic example)
-            return isValidPawnMove(boardArray, piece[0], startX, startY, targetX, targetY);
+            moves = pawnMoves(board, piece[0], xPos, yPos);
+            break;
         case 'r': // Rook move
-            return isValidRookMove(boardArray, piece[0], startX, startY, targetX, targetY);
+            moves = rookMoves(board, piece[0], xPos, yPos);
+            break;
         case 'n': // Knight move
-            return isValidKnightMove(boardArray, piece[0], startX, startY, targetX, targetY);
+            moves = knightMoves(board, piece[0], xPos, yPos);
+            break;
         case 'b': // Bishop move
-            return isValidBishopMove(boardArray, piece[0], startX, startY, targetX, targetY);
+            moves = bishopMoves(board, piece[0], xPos, yPos);
+            break;
         case 'q': // Queen move
-            return isValidQueenMove(boardArray, piece[0], startX, startY, targetX, targetY);
+            moves = queenMoves(board, piece[0], xPos, yPos);
+            break;
         case 'k': // King move
-            return isValidKingMove(boardArray, piece[0], startX, startY, targetX, targetY);
-        default:
-            return false;
+            moves = kingMoves(board, piece[0], xPos, yPos);
+            break;
     }
-}
 
-function isValidPawnMove(boardArray, color, startX, startY, targetX, targetY) {
-    if (color === 'w') {
-        // eat piece not of the same color
-        if (targetY === startY - 1 && Math.abs(targetX - startX) === 1) {
-            return boardArray[targetY][targetX] != null && boardArray[targetY][targetX][0] != color;
-        }
-        if (startX != targetX || startY == 0) return false;
-        // one forward piece
-        let moveOnce  = (targetY === startY - 1 && boardArray[startY - 1][targetX] === null);
-        // if didn't move
-        if (startY === 6) {
-            // two forward piece
-            let moveTwice = (targetY === startY - 2 && boardArray[startY - 2][targetX] === null);
-            return moveOnce || moveTwice; 
-        } 
-        return moveOnce;
-
-    } else {
-        // eat piece not of the same color
-        if (targetY === startY + 1 && Math.abs(targetX - startX) === 1) {
-            return boardArray[targetY][targetX] != null && boardArray[targetY][targetX][0] != color;
-        }
-        if (startX != targetX || startY == 7) return false;
-        // one forward piece
-        let t1 = boardArray[startY + 1][targetX];
-        let moveOnce  = (targetY === startY + 1 && (t1 === null || t1[0] !== color));
-        // if didn't move
-        if (startY === 1) {
-            // two forward piece
-            let t2 = boardArray[startY + 2][targetX];
-            let moveTwice = (targetY === startY + 2 && (t2 === null || t2[0] !== color));
-            return moveOnce || moveTwice; 
-        } 
-        return moveOnce;
+    if (onCheck) {
+        let ans = [];
+        // return intersection between color's valid moves and moves
+        return moves;
     }
+    return moves;
 }
 
-function isValidRookMove(boardArray, color, startX, startY, targetX, targetY) {
-
-    // if going to eat of the same color
-    if (boardArray[targetY][targetX] != null && boardArray[targetY][targetX][0] === color) return false;
-    // eat in horizontal or vertical lines, not of the same color
-    return (startX === targetX || startY === targetY)
-        && isPathClearForRook(boardArray, startX, startY, targetX, targetY);
+export function checkColor(piece, color) {
+    if (piece === null) return false;
+    return piece[0] === color;
 }
 
-function isPathClearForRook(boardArray, startX, startY, targetX, targetY) {
-    // we already know its moving either horizontally or vertically
-    // moving vertically
-    if (startX === targetX) {
-        const step = targetY > startY ? 1 : -1;
-        for (let y = startY + step; y !== targetY; y += step) {
-            if (boardArray[y][startX] !== null) {
-                // path isn't empty
-                return false;
-            }
-        }
-    // moving horizontally
-    } else if (startY === targetY) {
-        const step = targetX > startX ? 1 : -1;
-        for (let x = startX + step; x !== targetX; x += step) {
-            if (boardArray[startY][x] !== null) {
-                // path isn't empty
-                return false;
-            }
-        }
-    } else {
-        return false;
+// no en pessant yet
+function pawnMoves(board, color, xPos, yPos) {
+
+    let moves = [];
+    let oppColor = (color === 'w') ? 'b' : 'w';
+    // can eat of the opposite color
+   
+    if (yPos-1 >= 0) {
+        if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos+1, yPos-1]);
+        if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos-1, yPos-1]);
     }
-    return true;
-}
-
-function isValidKnightMove(boardArray, color, startX, startY, targetX, targetY) {
-    const dx = Math.abs(startX - targetX);
-    const dy = Math.abs(startY - targetY);
-    // if correct direction, and not of the same color
-    return ((dx === 2 && dy === 1) || (dx === 1 && dy === 2))
-        && (boardArray[targetY][targetX] == null || boardArray[targetY][targetX][0] !== color);
-}
-
-function isValidBishopMove(boardArray, color, startX, startY, targetX, targetY) {
-    // cant eat the same color
-    if (boardArray[targetY][targetX] !== null && boardArray[targetY][targetX][0] === color) return false;
-
-    // check it moves diagonally
-    if (Math.abs(startX - targetX) === Math.abs(startY - targetY)) {
-        return isPathClearForBishop(boardArray, startX, startY, targetX, targetY);
-    }
-    return false;
-}
-
-function isPathClearForBishop(boardArray, startX, startY, targetX, targetY) {
-
-    let deltaX = targetX - startX;
-    let deltaY = targetY - startY;
-
-    // direction of movement
-    const stepX = deltaX > 0 ? 1 : -1;
-    const stepY = deltaY > 0 ? 1 : -1;
-
-    // check that path is empty
-    for (let i = 1; i < Math.abs(deltaX); i++) {
-        const x = startX + (i * stepX);
-        const y = startY + (i * stepY);
-        if (boardArray[y][x] !== null) {
-            // path isn't empty
-            return false;
-        }
-    }
-    return true;
-}
-
-function isValidQueenMove(boardArray, color, startX, startY, targetX, targetY) {
-
-    if (boardArray[targetY][targetX] !== null && boardArray[targetY][targetX][0] === color) return false;
-    // check horizontal or vertical move
-    if (startX === targetX || startY === targetY) {
-        return isValidRookMove(boardArray, color, startX, startY, targetX, targetY);
-    // check for diagonal move
-    } else if (Math.abs(startX - targetX) === Math.abs(startY - targetY)) {
-        return isValidBishopMove(boardArray, color, startX, startY, targetX, targetY);
-    }
-    // not a valid move
-    return false;
-}
-
-function isValidKingMove(boardArray, color, startX, startY, targetX, targetY) {
     
-    if (boardArray[targetY][targetX] !== null && boardArray[targetY][targetX][0] === color) return false;
-    // calculate travel
-    const deltaX = Math.abs(startX - targetX);
-    const deltaY = Math.abs(startY - targetY);
-    if (deltaX == 0 && deltaY == 0) return false;
-    // move one square
-    if (deltaX <= 1 && deltaY <= 1) {
-        // check for check
-        return true;
-    }
-    return false;
-}
-
-export function isValidCastling(boardArray, color, startX, startY, targetX, targetY, whiteCastleLeft, whiteCastleRight, blackCastleLeft, blackCastleRight) {
-    
-    let deltaX = targetX - startX;
-    let deltaY = targetY - startY;
-
-    if (deltaY !== 0 || Math.abs(deltaX) !== 2) return false;
-
-    // its like moving a rook from the king pos to one before the rook pos
     if (color == 'w') {
-        // right castle
-        if (deltaX > 0) {
-            if (!whiteCastleRight) return false;
-            return isPathClearForRook(boardArray, 4, 7, 6, 7);
-        // left castle
-        } else {
-            if (!whiteCastleLeft) return false;
-            return isPathClearForRook(boardArray, 4, 7, 1, 7);
+         // can eat of the opposite color
+        if (yPos-1 >= 0) {
+            if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos+1, yPos-1]);
+            if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos-1, yPos-1]);
         }
-    // im not reversing the directions
+        // move twice at start
+        if (yPos == 6 && board[yPos-2][xPos] === null) moves.push([xPos, yPos-2]);
+        // move once forward
+        if (yPos > 0  && board[yPos-1][xPos] === null) moves.push([xPos, yPos-1]);
+    // if black
     } else {
-        // right castle
-        if (deltaX > 0) {
-            if (!blackCastleRight) return false;
-            return isPathClearForRook(boardArray, 4, 0, 6, 0);
-        // left castle
-        } else {
-            if (!blackCastleLeft) return false;
-             return isPathClearForRook(boardArray, 4, 0, 1, 0);
+        // can eat of the opposite color
+        if (yPos+1 < 8) {
+            if (xPos+1  < 8 && checkColor(board[yPos+1][xPos+1], oppColor)) moves.push([xPos+1, yPos+1]);
+            if (xPos-1 >= 0 && checkColor(board[yPos+1][xPos-1], oppColor)) moves.push([xPos-1, yPos+1]);
+        }
+        // move twice at start
+        if (yPos == 1 && board[yPos+2][xPos] === null) moves.push([xPos, yPos+2]);
+        // move once forward
+        if (yPos <  7 && board[yPos+1][xPos] === null) moves.push([xPos, yPos+1]);
+    }
+
+    return moves;
+}
+
+function rookMoves(board, color, xPos, yPos) {
+    let moves = [];
+    let oppColor = (color === 'w') ? 'b' : 'w';
+    let xTemp;
+    let yTemp;
+    for (let i=0; i < rookDirections.length; i++) {
+        xTemp = xPos;
+        yTemp = yPos;
+        while (xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8) {
+            xTemp += rookDirections[i][0];
+            yTemp += rookDirections[i][1];
+            if (!(xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8)) break;
+            // stop if same color
+            if (checkColor(board[yTemp][xTemp], color)) break;
+            moves.push([xTemp, yTemp]);
+            // at first that can eat, break
+            if (checkColor(board[yTemp][xTemp], oppColor)) break;
         }
     }
+    return moves;
+}
+
+function knightMoves(board, color, xPos, yPos) {
+    let moves = [];
+    let oppColor = (color === 'w') ? 'b' : 'w';
+    let xTemp;
+    let yTemp;
+    for (let i=0; i < knightDirections.length; i++) {
+        xTemp = xPos;
+        yTemp = yPos;
+        if (xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8) {
+            xTemp += knightDirections[i][0];
+            yTemp += knightDirections[i][1];
+            if (!(xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8)) continue;
+            // stop if same color
+            if (checkColor(board[yTemp][xTemp], color)) continue;
+            moves.push([xTemp, yTemp]);
+            // at first that can eat, continue
+            if (checkColor(board[yTemp][xTemp], oppColor)) continue;
+        }
+    }
+    return moves;
+}
+
+function bishopMoves(board, color, xPos, yPos) {
+    let moves = [];
+    let oppColor = (color === 'w') ? 'b' : 'w';
+    let xTemp;
+    let yTemp;
+    for (let i=0; i < bishopDirections.length; i++) {
+        xTemp = xPos;
+        yTemp = yPos;
+        while (xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8) {
+            xTemp += bishopDirections[i][0];
+            yTemp += bishopDirections[i][1];
+            if (!(xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8)) break;
+            // stop if same color
+            if (checkColor(board[yTemp][xTemp], color)) break;
+            moves.push([xTemp, yTemp]);
+            // at first that can eat, break
+            if (checkColor(board[yTemp][xTemp], oppColor)) break;
+        }
+    }
+    return moves;
+}
+
+function queenMoves(board, color, xPos, yPos) {
+    let moves = [];
+    moves.push.apply(moves, bishopMoves(board, color, xPos, yPos));
+    moves.push.apply(moves, rookMoves(board, color, xPos, yPos));
+    return moves;
+}
+
+function kingMoves(board, color, xPos, yPos) {
+    let moves = [];
+    let oppColor = (color === 'w') ? 'b' : 'w';
+    let xTemp;
+    let yTemp;
+    for (let i=0; i < kingDirections.length; i++) {
+        xTemp = xPos;
+        yTemp = yPos;
+        if (xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8) {
+            xTemp += kingDirections[i][0];
+            yTemp += kingDirections[i][1];
+            if (!(xTemp >= 0 && xTemp < 8 && yTemp >= 0 && yTemp < 8)) continue;
+            // stop if same color
+            if (checkColor(board[yTemp][xTemp], color)) continue;
+            moves.push([xTemp, yTemp]);
+            // at first that can eat, continue
+            if (checkColor(board[yTemp][xTemp], oppColor)) continue;
+        }
+    }
+    return moves;
 }

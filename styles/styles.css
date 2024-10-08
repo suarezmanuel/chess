@@ -46,15 +46,37 @@ html, body {
 }
 
 .hint {
-    background-color: var(--color-transparent-black-14);
+    background-color: rgba(0, 0, 0, 0.14); /* Semi-transparent black */
     padding: 4.2%;
+    z-index: 3;
+    background-clip: content-box;
+    border-radius: 50%;
+    box-sizing: border-box;
+    pointer-events: none;
+    position: absolute;
+    width: 12.5%;
+    height: 12.5%;
 }
+
+.capture-hint {
+    border: 5px solid rgba(0, 0, 0, 0.14); /* Semi-transparent black border */
+    z-index: 3;
+    background-clip: content-box;
+    border-radius: 50%;
+    box-sizing: border-box;
+    pointer-events: none;
+    position: absolute;
+    width: 12.5%;
+    height: 12.5%;
+}
+
 .capture-hint, .hint {
     background-clip: content-box;
     border-radius: 50%;
     box-sizing: border-box;
     pointer-events: none;
 }
+
 .capture-hint, .highlight, .hint {
     height: 12.5%;
     left: 0;
