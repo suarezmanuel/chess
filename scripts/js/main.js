@@ -1,4 +1,4 @@
-import { getValidMoves, checkColor, getValidMovesWhite, getValidMovesBlack } from "./validMoves.js"
+import { getValidMoves, checkColor, getValidMovesWhite, getValidMovesBlack, isInCheck } from "./validMoves.js"
 
 const boardArray = [
     ['br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br'],
@@ -11,13 +11,26 @@ const boardArray = [
     ['wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr']
 ];
 
+// {position, piece} 
+export const whitePositions = new Map([[[0,6], 'p'], [[1,6], 'p'], [[2,6], 'p'], [[3,6], 'p'], [[4,6], 'p'], [[5,6], 'p'], [[6,6], 'p'], [[7,6], 'p'], 
+                                       [[0,7], 'r'], [[1,7], 'n'], [[2,7], 'b'], [[3,7], 'q'], [[4,7], 'k'], [[5,7], 'b'], [[6,7], 'n'], [[7,7], 'r']]);
+
+export const blackPositions = new Map([[[0,1], 'p'], [[1,1], 'p'], [[2,1], 'p'], [[3,1], 'p'], [[4,1], 'p'], [[5,1], 'p'], [[6,1], 'p'], [[7,1], 'p'], 
+                                       [[0,0], 'r'], [[1,0], 'n'], [[2,0], 'b'], [[3,0], 'q'], [[4,0], 'k'], [[5,0], 'b'], [[6,0], 'n'], [[7,0], 'r']]);
+    
 let possibleMoves = [];
 let startX;
 let startY;
 let pieceStr;
 let gameEnded = false;
 let onCheck = false;
-
+    
+export function deleteFromMap(map, arr) {
+    map.forEach((value, key) => {
+        if (arr[0] == key[0] && arr[1] == key[1]) map.delete(key);
+    });
+}
+    
 document.addEventListener("DOMContentLoaded", () => {
     const boardElement = document.querySelector('.board');
     const boardSize = 400; // Match the board size from the CSS
@@ -102,6 +115,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 draggedPiece.style.opacity = "0";
             }, 0);
 
+            // let allMoves = [];  
+            // if (pieceStr) {
+            //     const color = pieceStr.charAt(0);
+            //     if (color == 'w') {
+            //         allMoves = getValidMovesWhite(boardArray, pieceStr, startX, startY);
+            //         possibleMoves
+            //     } else {
+            //         allMoves = getValidMovesBlack(boardArray, pieceStr, startX, startY);
+            //     }
+            //     showHints(allMoves);
+            // }
+
             possibleMoves = getValidMoves(boardArray, pieceStr, startX, startY, onCheck);
             showHints(possibleMoves);
         });
@@ -155,6 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+
     // Handle the drop event
     boardElement.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -192,10 +218,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     draggedPiece.classList.add(pieceStr);
                 }
          
+                if (pieceStr.charAt(0) == 'w') {
+                    deleteFromMap(whitePositions, [startX, startY]);
+                    whitePositions.set([targetX, targetY], pieceStr.charAt(1));
+                    deleteFromMap(blackPositions, [targetX, targetY]);
+                } else {
+                    deleteFromMap(blackPositions, [startX, startY]);
+                    blackPositions.set([targetX, targetY], pieceStr.charAt(1));
+                    deleteFromMap(whitePositions, [targetX, targetY]);
+                }
+
                 // Update the board array
                 boardArray[targetY][targetX] = pieceStr;
                 boardArray[startY][startX] = null;
 
+                let positions = pieceStr.charAt(0) === "b" ? whitePositions : blackPositions;
+                let kingPos = [];
+                positions.forEach((value, key) => {
+                    if (value == 'k') kingPos = key;
+                });
+                
                 // Update the class of the dragged piece
                 draggedPiece.classList.remove(currentClass);
                 draggedPiece.classList.add(`square-${targetX + 1}${8 - targetY}`);
@@ -204,16 +246,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Switch turn to the other player
                 currentTurn = (currentTurn === 'w') ? 'b' : 'w';
-                updateDraggablePieces();
-
+                
+                onCheck = isInCheck(boardArray, pieceStr.charAt(0) === "w" ? "b" : "w", kingPos);
                 // check if we put the oponent in checkmate or stalemate
                 let allMoves;
                 if (currentTurn === 'w') {
-                    allMoves = getValidMovesWhite();
+                    allMoves = getValidMovesWhite(boardArray);
                 } else {
-                    allMoves = getValidMovesBlack();
+                    allMoves = getValidMovesBlack(boardArray);
                 }
-                if (allMoves == []) {
+                if (allMoves.length == 0) {
                     if (onCheck) {
                         console.log("checkmate,", ((pieceStr[0] == 'w') ? "white" : "black"), "wins");
                     } else {
@@ -224,6 +266,8 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 console.log("Invalid move!");
             }
+
+            updateDraggablePieces();
         }
     });
 
