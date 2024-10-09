@@ -21,10 +21,19 @@ export const blackPositions = new Map([[[0,1], 'p'], [[1,1], 'p'], [[2,1], 'p'],
 let possibleMoves = [];
 let startX;
 let startY;
+export let prevX;
+export let prevY;
 let pieceStr;
 let gameEnded = false;
 let onCheck = false;
-    
+
+export let hasWhiteKingMoved = false;
+export let hasWhiteRightRookMoved = false;
+export let hasWhiteLeftRookMoved = false;
+export let hasBlackKingMoved = false;
+export let hasBlackRightRookMoved = false;
+export let hasBlackLeftRookMoved = false;
+
 export function deleteFromMap(map, arr) {
     map.forEach((value, key) => {
         if (arr[0] == key[0] && arr[1] == key[1]) map.delete(key);
@@ -115,18 +124,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 draggedPiece.style.opacity = "0";
             }, 0);
 
-            // let allMoves = [];  
-            // if (pieceStr) {
-            //     const color = pieceStr.charAt(0);
-            //     if (color == 'w') {
-            //         allMoves = getValidMovesWhite(boardArray, pieceStr, startX, startY);
-            //         possibleMoves
-            //     } else {
-            //         allMoves = getValidMovesBlack(boardArray, pieceStr, startX, startY);
-            //     }
-            //     showHints(allMoves);
-            // }
-
             possibleMoves = getValidMoves(boardArray, pieceStr, startX, startY, onCheck);
             showHints(possibleMoves);
         });
@@ -188,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
         clearHints();
 
         if (draggedPiece) {
+
             const rect = boardElement.getBoundingClientRect();
             const squareSize = rect.width / 8;
 
@@ -198,41 +196,124 @@ document.addEventListener("DOMContentLoaded", () => {
             // move pieces if castling
 
             if (possibleMoves.some(move => move[0] === targetX && move[1] === targetY)) {
-            
-                updateCastling();
 
+                let piece = pieceStr.charAt(1);
+                let color = pieceStr.charAt(0);
+            
                 // Capture if there's a piece at the destination
                 if (boardArray[targetY][targetX] !== null) {
                     const capturedPiece = document.querySelector(`.square-${targetX + 1}${8 - targetY}.piece`);
                     if (capturedPiece) capturedPiece.remove();
+                    let positions = color === 'b' ? whitePositions : blackPositions;
+                    deleteFromMap(positions, [targetX, targetY]);
                 }
 
                 // move the piece, doesn't create a new one
                 draggedPiece.style.left = `${targetX * squareSize}px`;
                 draggedPiece.style.top  = `${targetY * squareSize}px`;
 
+
                 // pawn promotion
-                if (pieceStr[1] === 'p' && (targetY == 0 || targetY == 7)) { 
-                    pieceStr = pieceStr[0] + 'q';
+                if (piece === 'p' && (targetY == 0 || targetY == 7)) { 
+                    piece = 'q';
+                    pieceStr = color + piece;
                     draggedPiece.classList.remove('wp', 'bp');
                     draggedPiece.classList.add(pieceStr);
                 }
-         
-                if (pieceStr.charAt(0) == 'w') {
+
+                // en passant
+                if (piece === 'p') {
+                    let y = targetY + (color === "w" ? 1 : -1);
+                    if (Math.abs(targetX-startX) === 1 && boardArray[targetY][targetX] === null) {
+
+                        boardArray[targetY + (color === "w" ? 1 : -1)][targetX] = null; 
+                        let capturedPawn = document.querySelector(`.square-${targetX + 1}${8 - y}.piece`);
+                        capturedPawn.remove();
+
+                        let positions = color === 'b' ? whitePositions : blackPositions;
+                        deleteFromMap(positions, [targetX, y]);
+                        
+                    }
+                }
+
+                // update castling parameters
+                if (piece === 'k') {
+                    if (color === 'w')
+                        hasWhiteKingMoved = true;
+                    else
+                        hasBlackKingMoved = true;
+                } else if (piece === 'r') {
+                    if (startX === 0 && startY === 0)
+                        hasBlackLeftRookMoved = true;
+                    else if (startX === 0 && startY === 7)
+                        hasWhiteLeftRookMoved = true;
+                    else if (startX === 7 && startY === 0)
+                        hasBlackRightRookMoved = true;
+                    else if (startX === 7 && startY === 7)
+                        hasWhiteRightRookMoved = true;
+                }
+
+                // check for castle
+                if (piece === 'k' && Math.abs(targetX - startX) > 1) {
+                    let rookStartX, rookStartY, rookTargetX, rookTargetY, rookStr;
+                    if (color === 'w') {
+                        if (targetX === 6) {
+                            rookStartX = 7;
+                            rookStartY = 7;
+                            rookTargetX = 5;
+                            rookTargetY = 7;
+                        } else {
+                            rookStartX = 0;
+                            rookStartY = 7;
+                            rookTargetX = 3;
+                            rookTargetY = 7;
+                        }
+                        rookStr = 'wr';
+                        deleteFromMap(whitePositions, [rookStartX, rookStartY]);
+                        whitePositions.set([rookTargetX, rookTargetY], 'r');
+                    } else {
+                        if (targetX === 6) {
+                            rookStartX = 7;
+                            rookStartY = 0;
+                            rookTargetX = 5;
+                            rookTargetY = 0;
+                        } else {
+                            rookStartX = 0;
+                            rookStartY = 0;
+                            rookTargetX = 3;
+                            rookTargetY = 0;
+                        }
+                        rookStr = 'br';
+                        deleteFromMap(blackPositions, [rookStartX, rookStartY]);
+                        blackPositions.set([rookTargetX, rookTargetY], 'r');
+                    }
+                    boardArray[rookTargetY][rookTargetX] = rookStr;
+                    boardArray[rookStartY][rookStartX] = null;
+                    let rook = document.querySelector(`.square-${rookStartX + 1}${8 - rookStartY}.piece`);
+                    rook.classList.replace(`square-${rookStartX + 1}${8 - rookStartY}`, `square-${rookTargetX + 1}${8 - rookTargetY}`);
+                    rook.style.left = `${rookTargetX * squareSize}px`;
+                    rook.style.top  = `${rookTargetY * squareSize}px`;
+                }
+                
+                if (color == 'w') {
                     deleteFromMap(whitePositions, [startX, startY]);
-                    whitePositions.set([targetX, targetY], pieceStr.charAt(1));
+                    whitePositions.set([targetX, targetY], piece);
                     deleteFromMap(blackPositions, [targetX, targetY]);
                 } else {
                     deleteFromMap(blackPositions, [startX, startY]);
-                    blackPositions.set([targetX, targetY], pieceStr.charAt(1));
+                    blackPositions.set([targetX, targetY], piece);
                     deleteFromMap(whitePositions, [targetX, targetY]);
-                }
+                }       
+                
 
                 // Update the board array
                 boardArray[targetY][targetX] = pieceStr;
                 boardArray[startY][startX] = null;
 
-                let positions = pieceStr.charAt(0) === "b" ? whitePositions : blackPositions;
+                prevX = targetX;
+                prevY = targetY;
+
+                let positions = color === "b" ? whitePositions : blackPositions;
                 let kingPos = [];
                 positions.forEach((value, key) => {
                     if (value == 'k') kingPos = key;
@@ -299,29 +380,5 @@ document.addEventListener("DOMContentLoaded", () => {
         // Append the highlights to the board
         boardElement.appendChild(startHighlight);
         boardElement.appendChild(targetHighlight);
-    }
-
-    function updateCastling() {
-        // if rook is taken castling isn't possible
-        // if (isValidMove(boardArray, pieceType, startX, startY, targetX, targetY)) {
-        // Update castling rights if the king or rook moves
-        // if (pieceType != null) {
-        //     // If king moves
-        //     if (pieceType[1] === 'k') {
-        //         if (pieceType[0] === 'w')
-        //             whiteCastleLeft = whiteCastleRight = false;
-        //         else
-        //             blackCastleLeft = blackCastleRight = false;
-        //     // If rook moves
-        //     } else if (pieceType[1] === 'r') {
-        //         if (pieceType[0] === 'w') {
-        //             if (startX == 0) whiteCastleLeft = false;
-        //             if (startX == 7) whiteCastleRight = false;
-        //         } else {
-        //             if (startX == 0) blackCastleLeft = false;
-        //             if (startX == 7) blackCastleRight = false;
-        //         }
-        //     }
-        // }
     }
 });

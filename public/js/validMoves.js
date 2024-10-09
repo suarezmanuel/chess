@@ -1,4 +1,4 @@
-import { whitePositions, blackPositions, deleteFromMap } from "./main.js";
+import { whitePositions, blackPositions, hasBlackKingMoved, hasBlackLeftRookMoved, hasBlackRightRookMoved, hasWhiteKingMoved, hasWhiteLeftRookMoved, hasWhiteRightRookMoved, prevX, prevY } from "./main.js";
 
 // up right down left
 let rookDirections  = [[0,-1], [1,0], [0,1], [-1,0]];
@@ -14,24 +14,6 @@ export function getValidMovesWhite(board) {
     whitePositions.forEach((value, key) => {
         let a = getValidMoves(board, "w"+value, key[0], key[1]);
         moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
-        // a.forEach(move => {
-        //     let temp = board[move[1]][move[0]];
-        //     // start
-        //     board[key[1]][key[0]] = null;
-        //     // target
-        //     board[move[1]][move[0]] = "w"+value;
-        //     if (value == 'k') kingPos = [move[0][move[1]]];
-
-        //     if (!isInCheck(board, 'w', kingPos[0], kingPos[1])) {
-        //         if (!moves.some(a => a[0] == move[0] && a[1] == move[1])) moves.push(move);
-        //     }
-
-        //     // start
-        //     board[key[1]][key[0]]   = "w"+value;
-        //     if (value == 'k') kingPos = [key[0][key[1]]];
-        //     // end
-        //     board[move[1]][move[0]] = temp;    
-        // });
     });
     return moves;
 }
@@ -42,24 +24,6 @@ export function getValidMovesBlack(board) {
     blackPositions.forEach((value, key) => {
         let a = getValidMoves(board, "b"+value, key[0], key[1]);
         moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
-        // a.forEach(move => {
-        //     let temp = board[move[1]][move[0]];
-        //     // start
-        //     board[key[1]][key[0]]   = null;
-        //     // target
-        //     board[move[1]][move[0]] = "b"+value;
-        //     if (value == 'k') kingPos = [move[0][move[1]]];
-
-        //     if (!isInCheck(board, 'b')) {
-        //         if (!moves.some(a => a[0] == move[0] && a[1] == move[1])) moves.push(move);
-        //     }
-            
-        //     // start
-        //     board[key[1]][key[0]]   = "b"+value;
-        //     if (value == 'k') kingPos = [key[0][key[1]]];
-        //     // end
-        //     board[move[1]][move[0]] = temp;    
-        // });
     });
     return moves;
 }
@@ -93,21 +57,6 @@ export function validMovesFromArray(board, startX, startY, array) {
         if (piece == 'k') kingPos = [startY, startX];
         // end
         board[move[1]][move[0]] = temp;   
-
-        // if (piece == 'k') {
-        //     if (color == 'w') {
-        //         // whitePositions.set([move[0], move[1]], color);
-        //         // deleteFromMap(whitePositions, [move[0], move[1]]);
-        //         // if (temp) blackPositions.set([move[0], move[1]], temp.charAt(1));
-        //         deleteFromMap(whitePositions, [move[0], move[1]]);
-        //         whitePositions.set([startX, startY], piece);
-        //         if (temp) blackPositions.set([move[0], move[1]], temp.charAt(1));
-        //     } else {
-        //         deleteFromMap(blackPositions, [move[0], move[1]]);
-        //         blackPositions.set([startX, startY], piece);
-        //         if (temp) whitePositions.set([move[0], move[1]], temp.charAt(1));
-        //     }
-        // }
     });
     return moves;
 }
@@ -158,12 +107,28 @@ function pawnMoves(board, color, xPos, yPos) {
     let moves = [];
     let oppColor = (color === 'w') ? 'b' : 'w';
     // can eat of the opposite color
-   
+    
     if (yPos-1 >= 0) {
         if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos+1, yPos-1]);
         if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos-1, yPos-1]);
     }
     
+    // en passant
+    if (prevX !== undefined && prevY !== undefined && xPos > 0 && xPos < 7 && checkPiece(board[prevY][prevX], 'p')) {
+        if (color == 'w') {
+            if (yPos == 3 && prevY == 3) {
+                // prev is last target X
+                if (prevX == xPos-1 || prevX == xPos+1)
+                    moves.push([prevX, yPos-1]);
+            }
+        } else {
+            if (yPos == 4 && prevY == 4) {
+                if (prevX == xPos-1 || prevX == xPos+1)
+                    moves.push([prevX, yPos+1]);
+            }
+        }
+    }
+
     if (color == 'w') {
          // can eat of the opposite color
         if (yPos-1 >= 0) {
@@ -282,16 +247,33 @@ function kingMoves(board, color, xPos, yPos) {
             if (checkColor(board[yTemp][xTemp], oppColor)) continue;
         }
     }
+    return [...moves, ...castleMoves(board, color)];
+}
+
+function castleMoves(board, color) {
+    let moves = [];
+    let hasKingMoved = color === 'w' ? hasWhiteKingMoved : hasBlackKingMoved;
+    if (hasKingMoved) return moves;
+    if (color === 'w') {
+        if (!hasWhiteLeftRookMoved) {
+            if (board[7][0] === "wr" && board[7][1] === null && board[7][3] === null && board[7][3] === null) moves.push([2, 7]);
+        }
+        if (!hasWhiteRightRookMoved) {
+            if (board[7][7] === "wr" && board[7][5] === null && board[7][6] === null) moves.push([6, 7]);
+        }
+    } else {
+        if (!hasBlackLeftRookMoved) {
+            if (board[0][0] === "br" && board[0][1] === null && board[0][3] === null && board[0][3] === null) moves.push([2, 0]);
+        }
+        if (!hasBlackRightRookMoved) {
+            if (board[0][7] === "br" && board[0][5] === null && board[0][6] === null) moves.push([6, 0]);
+        }
+    }
     return moves;
 }
 
 export function isInCheck(board, color, kingPos) {
 
-    //let positions = color === "w" ? whitePositions : blackPositions;
-    // let kingPos = [];
-    // positions.forEach((value, key) => {
-    //     if (value == 'k') kingPos = key;
-    // });
     let xPos = kingPos[0];
     let yPos = kingPos[1];
 
