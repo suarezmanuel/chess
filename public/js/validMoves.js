@@ -356,10 +356,11 @@ export function isInCheck(board, color, kingPos) {
     let _isInCheck = false;
 
 
+    // this is not a mistake, white should check backwards and black forwards
     if (color == 'w') {
-        _pawnMoves = [[xPos-1, yPos-1], [xPos+1, yPos-1]];
-    } else {
         _pawnMoves = [[xPos-1, yPos+1], [xPos+1, yPos+1]];
+    } else {
+        _pawnMoves = [[xPos-1, yPos-1], [xPos+1, yPos-1]];
     }
 
     _knightMoves.forEach(square => {
