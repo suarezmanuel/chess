@@ -245,7 +245,7 @@ function movePieceServer(startX, startY, targetX, targetY) {
         }
         rookStr = 'wr';
         deleteFromMap(whitePositions, [rookStartX, rookStartY]);
-        whitePositions.set(`${rookTargetX},${rookTargetY}`, 'r');
+        whitePositions.set([rookTargetX, rookStartY], 'r');
       } else {
         if (targetX === 6) {
           rookStartX = 7;

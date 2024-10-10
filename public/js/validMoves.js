@@ -155,8 +155,13 @@ function pawnMoves(board, color, xPos, yPos) {
     // can eat of the opposite color
     
     if (yPos-1 >= 0) {
-        if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos-1]);
-        if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos-1]);
+        if (color === 'w') {
+            if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos-1]);
+            if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos-1]);
+        } else {
+            if (xPos+1  < 8 && checkColor(board[yPos+1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos+1]);
+            if (xPos-1 >= 0 && checkColor(board[yPos+1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos+1]);
+        }
     }
     
     // en passant
