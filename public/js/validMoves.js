@@ -358,9 +358,9 @@ export function isInCheck(board, color, kingPos) {
 
     // this is not a mistake, white should check backwards and black forwards
     if (color == 'w') {
-        _pawnMoves = [[xPos-1, yPos+1], [xPos+1, yPos+1]];
-    } else {
         _pawnMoves = [[xPos-1, yPos-1], [xPos+1, yPos-1]];
+    } else {
+        _pawnMoves = [[xPos-1, yPos+1], [xPos+1, yPos+1]];
     }
 
     _knightMoves.forEach(square => {
@@ -396,8 +396,8 @@ export function isInCheck(board, color, kingPos) {
     if (_isInCheck) return true;
 
     _pawnMoves.forEach(square => {
-        if (square[2] >= 0 && square[2] < 8 && square[3] >= 0 && square[3] < 7
-            && checkColor(board[square[3]][square[2]], oppColor) && checkPiece(board[square[3]][square[2]], 'p')) {
+        if (square[0] >= 0 && square[0] < 8 && square[1] >= 0 && square[1] < 7
+            && checkColor(board[square[1]][square[0]], oppColor) && checkPiece(board[square[1]][square[0]], 'p')) {
             _isInCheck = true;
         }
     });

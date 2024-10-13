@@ -1,6 +1,7 @@
 // main2.js
 
 import { io } from 'https://cdn.socket.io/4.5.4/socket.io.esm.min.js';
+import { connectBot } from './ai.js';
 
 let possibleMoves = [];
 let startX;
@@ -19,23 +20,17 @@ const urlParams = new URLSearchParams(window.location.search);
 const roomCode = urlParams.get('room');
 
 // Join the room
-socket.emit('joinRoom', roomCode);
+if (roomCode) {
+    socket.emit('joinRoom', roomCode);
+} else {
+    socket.emit('joinRoom', 807);
+    connectBot();
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardElement = document.querySelector('.board');
     const boardSize = 400; // Match the board size from the CSS
     const squareSize = boardSize / 8; // Each square is 50px
-
-    // Position the pieces on the board
-    document.querySelectorAll('.piece').forEach(piece => {
-        const className = Array.from(piece.classList).find(cls => cls.startsWith("square-"));
-        const [, x, y] = className.match(/square-(\d)(\d)/);
-        const posX = (parseInt(x) - 1) * squareSize;
-        const posY = (8 - parseInt(y)) * squareSize;
-
-        piece.style.left = `${posX}px`;
-        piece.style.top = `${posY}px`;
-    });
 
     // Function to update the draggability of pieces
     function updateDraggablePieces() {
@@ -73,7 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function dragStartHandler(e) {
         // For macOS to not show the plus sign
         e.dataTransfer.effectAllowed = 'move';
-
         const rect = boardElement.getBoundingClientRect();
         const squareSize = rect.width / 8;
 
@@ -125,7 +119,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         moves.forEach(move => {
             const hint = document.createElement('div');
-            const targetSquareClass = `square-${move[2] + 1}${8 - move[3]}`;
+
+            // let x = playerColor === 'w' ? move[2] : 7-move[2];
+            // let y = playerColor === 'w' ? move[3] : 7-move[3];
+            let x = move[2];
+            let y = move[3];
+            const targetSquareClass = `square-${x + 1}${8 - y}`;
             const pieceAtTarget = document.querySelector(`.piece.${targetSquareClass}`);
 
             if (pieceAtTarget) {
@@ -135,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // Get the square position for the move
-            const { left, top } = getSquarePosition(move[2], move[3]);
+            const { left, top } = getSquarePosition(x, y);
 
             // Position the hint
             hint.style.left = `${left}px`;
@@ -187,7 +186,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 movePieceUI(currentClass, startX, startY, targetX, targetY);
 
                 // Send the move to the server
-                socket.emit('moveMade', { startX, startY, targetX, targetY, playerColor });
+                let sx = playerColor === 'w' ? startX : 7-startX;
+                let sy = playerColor === 'w' ? startY : 7-startY;
+                let tx = playerColor === 'w' ? targetX : 7-targetX;
+                let ty = playerColor === 'w' ? targetY : 7-targetY;
+
+                socket.emit('moveMade', { startX: sx, startY: sy, targetX: tx, targetY: ty, playerColor });
             } else {
                 console.log("Invalid move!");
             }
@@ -240,7 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // En passant
         if (piece === 'p') {
-            let y = targetY + (color === "w" ? 1 : -1);
+            let y = targetY + 1;
             if (Math.abs(targetX - startX) === 1) {
                 if (!capturedPiece) {
                     let capturedPawnClass = `square-${targetX + 1}${8 - y}`;
@@ -252,9 +256,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Check for castle
         if (piece === 'k' && Math.abs(targetX - startX) > 1) {
+            let tempTargetX = playerColor === 'w' ? targetX : 7-targetX;
             let rookStartX, rookStartY, rookTargetX, rookTargetY;
             if (color === 'w') {
-                if (targetX === 6) {
+                if (tempTargetX === 6) {
                     rookStartX = 7;
                     rookStartY = 7;
                     rookTargetX = 5;
@@ -266,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     rookTargetY = 7;
                 }
             } else {
-                if (targetX === 6) {
+                if (tempTargetX === 6) {
                     rookStartX = 7;
                     rookStartY = 0;
                     rookTargetX = 5;
@@ -278,6 +283,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     rookTargetY = 0;
                 }
             }
+            
+            rookStartX = playerColor === 'w' ? rookStartX : 7-rookStartX;
+            rookStartY = playerColor === 'w' ? rookStartY : 7-rookStartY;
+            rookTargetX = playerColor === 'w' ? rookTargetX : 7-rookTargetX;
+            rookTargetY = playerColor === 'w' ? rookTargetY : 7-rookTargetY;
+
             let rookStartClass = `square-${rookStartX + 1}${8 - rookStartY}`;
             let rookTargetClass = `square-${rookTargetX + 1}${8 - rookTargetY}`;
             let rook = document.querySelector(`.piece.${rookStartClass}`);
@@ -303,11 +314,53 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDraggablePieces();
     });
 
+    function createPieceDivs(positions, pieceColor) {
+        positions.forEach((piece, coordinates) => {
+            let [x, y] = coordinates; // Extract the x and y coordinates
+            const div = document.createElement('div');
+            x = playerColor === 'w' ? x : 7-x;
+            y = playerColor === 'w' ? y : 7-y;
+            div.className = `piece ${pieceColor}${piece} square-${x+1}${8-y}`;
+            div.setAttribute('draggable', 'true');
+            div.style = ''; // Add any inline styling if needed
+    
+            // Assuming you want to append these divs to an existing container, e.g., a board element
+            document.querySelector('.board').appendChild(div);
+        });
+    }
+
+    socket.on('positions', (data) => {
+        // showing the pieces as they appear in the server
+        document.querySelectorAll(".piece").forEach(div => div.remove());
+        document.querySelectorAll(".highlight").forEach(div => div.remove())
+
+        createPieceDivs(new Map(data.white), 'w');
+        createPieceDivs(new Map(data.black), 'b');
+
+        document.querySelectorAll('.piece').forEach(piece => {
+            const className = Array.from(piece.classList).find(cls => cls.startsWith("square-"));
+            const [, x, y] = className.match(/square-(\d)(\d)/);
+            const posX = (parseInt(x) - 1) * squareSize;
+            const posY = (8 - parseInt(y)) * squareSize;
+    
+            piece.style.left = `${posX}px`;
+            piece.style.top = `${posY}px`;
+        });
+
+        updateDraggablePieces();
+        attachEventListeners();
+    });
+
     // If opponent made a move
     socket.on('moveMade', (e) => {
         if (e.playerColor !== playerColor) {
-            const fromSquareClass = `square-${e.startX + 1}${8 - e.startY}`;
-            movePieceUI(fromSquareClass, e.startX, e.startY, e.targetX, e.targetY);
+            let startX = playerColor === 'w' ? e.startX : 7-e.startX;
+            let startY = playerColor === 'w' ? e.startY : 7-e.startY;
+            let targetX = playerColor === 'w' ? e.targetX : 7-e.targetX;
+            let targetY = playerColor === 'w' ? e.targetY: 7-e.targetY;
+
+            const fromSquareClass = `square-${startX + 1}${8 - startY}`;
+            movePieceUI(fromSquareClass, startX, startY, targetX, targetY);
             // Update current turn
             currentTurn = (currentTurn === 'w') ? 'b' : 'w';
             updateDraggablePieces();
@@ -322,6 +375,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     socket.on('receivePossibleMoves', (e) => {
         possibleMoves = e.possibleMoves;
+        if (playerColor === 'b') {
+            let moves = [];
+            possibleMoves.forEach(move => {
+                moves.push([7-move[0], 7-move[1], 7-move[2], 7-move[3]]);
+            });
+            possibleMoves = moves;
+        }
         // Update current turn
         currentTurn = playerColor;
         updateDraggablePieces();

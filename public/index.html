@@ -13,6 +13,8 @@
   <p>Enter a room code to join:</p>
   <input type="text" id="roomInput" placeholder="Room Code" />
   <button id="joinRoomBtn">Join Room</button>
+  <p>Or play against computer</p>
+  <button id="playBotBtn">Play against computer</button>
 
   <script>
     document.getElementById('joinRoomBtn').addEventListener('click', () => {
@@ -22,6 +24,10 @@
       } else {
         alert('Please enter a room code.');
       }
+    });
+
+    document.getElementById('playBotBtn').addEventListener('click', () => {
+      window.location.href = `/game`;
     });
   </script>
 </body>

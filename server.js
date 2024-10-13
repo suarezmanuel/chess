@@ -69,39 +69,66 @@ let currentTurn = 'w';
 let gameEnded = false;
 let gameResult = null;
 let possibleMoves = [];
+let playBot = false;
 
 // Players
 const players = {};
 
 // Handle socket connections
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log('New user connected');
 
   let playerColor = null;
+  //socket.on('joinRoom', (roomCode) => {
+  
+    // Assign player color
+    if (!players.white) {
+      players.white = socket;
+      playerColor = 'w';
+      socket.emit('playerColor', { color: 'w' });
+    } else if (!players.black) {
+      players.black = socket;
+      playerColor = 'b';
+      socket.emit('playerColor', { color: 'b' });
+    } else {
+      socket.emit('message', 'Game is full');
+      socket.disconnect();
+      return;
+    }
+  //})
+  
+  // socket.on('playBot', () => {
+  //   playBot = true;
+  //   if (!players.white) {
+  //     players.white = socket;
+  //     botColor = 'b'; // Bot plays black
+  //     socket.emit('playerColor', { color: 'w' });
+  //     startBotGame(botColor);
+  //   } else if (!players.black) {
+  //     players.black = socket;
+  //     botColor = 'w'; // Bot plays white
+  //     socket.emit('playerColor', { color: 'b' });
+  //     startBotGame(botColor);
+  //   } else {
+  //     socket.emit('message', 'Game is full');
+  //     socket.disconnect();
+  //   }
+  // })
+  
+  socket.emit('positions', {white: Array.from(whitePositions), black: Array.from(blackPositions)});
 
-  // Assign player color
-  if (!players.white) {
-    players.white = socket;
-    playerColor = 'w';
-    socket.emit('playerColor', { color: 'w' });
-  } else if (!players.black) {
-    players.black = socket;
-    playerColor = 'b';
-    socket.emit('playerColor', { color: 'b' });
-  } else {
-    socket.emit('message', 'Game is full');
-    socket.disconnect();
-    return;
+  await new Promise(r => setTimeout(r, 2000));
+
+  if (players.white && players.black) {
+    if (currentTurn === 'w') {
+      possibleMoves = getValidMovesWhite(boardArray);
+      players.white.emit('receivePossibleMoves', { possibleMoves });
+    } else if (currentTurn === 'b') {
+      possibleMoves = getValidMovesBlack(boardArray);
+      players.black.emit('receivePossibleMoves', { possibleMoves });
+    }
   }
-
-  if (currentTurn === 'w' && players.white) {
-    possibleMoves = getValidMovesWhite(boardArray);
-    players.white.emit('receivePossibleMoves', { possibleMoves });
-  } else if (currentTurn === 'b' && players.black) {
-    possibleMoves = getValidMovesBlack(boardArray);
-    players.black.emit('receivePossibleMoves', { possibleMoves });
-  }
-
+  
   // Handle 'moveMade' event
   socket.on('moveMade', (messageData) => {
     if (gameEnded) {
