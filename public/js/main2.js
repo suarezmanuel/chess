@@ -13,7 +13,7 @@ let gameEnded = false;
 let currentTurn = 'w';
 let draggedPiece = null;
 
-const socket = io();
+const socket = io('http://localhost:3000');
 
 // Extract the room code from the URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -23,8 +23,8 @@ const roomCode = urlParams.get('room');
 if (roomCode) {
     socket.emit('joinRoom', roomCode);
 } else {
-    socket.emit('joinRoom', 807);
     connectBot();
+    socket.emit('joinRoom', 807);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

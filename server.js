@@ -1,6 +1,6 @@
 import express from 'express';
 import http from 'http';
-import { Server } from 'socket.io'; // Import the Socket.IO server
+import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
@@ -68,34 +68,51 @@ let boardArray = [
 let currentTurn = 'w';
 let gameEnded = false;
 let gameResult = null;
+let moveNum = 1;
 let possibleMoves = [];
-let playBot = false;
 
 // Players
-const players = {};
+const players = {white : null, black : null};
 
 // Handle socket connections
 io.on('connection', async (socket) => {
   console.log('New user connected');
 
+  // console.log(players.white === null);
+  // console.log(players.black === null);
+
   let playerColor = null;
-  //socket.on('joinRoom', (roomCode) => {
+  socket.on('joinRoom', (roomCode) => {
   
     // Assign player color
-    if (!players.white) {
+    if (!players.white && (players.black || Math.random() < 0.5)) {
       players.white = socket;
       playerColor = 'w';
-      socket.emit('playerColor', { color: 'w' });
+      players.white.emit('playerColor', { color: 'w' });
     } else if (!players.black) {
       players.black = socket;
       playerColor = 'b';
-      socket.emit('playerColor', { color: 'b' });
+      players.black.emit('playerColor', { color: 'b' });
     } else {
       socket.emit('message', 'Game is full');
+      console.log('Game is full');
       socket.disconnect();
       return;
     }
-  //})
+    socket.emit('positions', {white: Array.from(whitePositions), black: Array.from(blackPositions)});
+  
+    if (players.white && players.black) {
+      if (currentTurn === 'w') {
+        possibleMoves = getValidMovesWhite(boardArray);
+        players.white.emit('receivePossibleMoves', { possibleMoves });
+      } else if (currentTurn === 'b') {
+        possibleMoves = getValidMovesBlack(boardArray);
+        players.black.emit('receivePossibleMoves', { possibleMoves });
+      }
+    }
+    // console.log(players.white === null);
+    // console.log(players.black === null);
+  })
   
   // socket.on('playBot', () => {
   //   playBot = true;
@@ -115,19 +132,6 @@ io.on('connection', async (socket) => {
   //   }
   // })
   
-  socket.emit('positions', {white: Array.from(whitePositions), black: Array.from(blackPositions)});
-
-  await new Promise(r => setTimeout(r, 2000));
-
-  if (players.white && players.black) {
-    if (currentTurn === 'w') {
-      possibleMoves = getValidMovesWhite(boardArray);
-      players.white.emit('receivePossibleMoves', { possibleMoves });
-    } else if (currentTurn === 'b') {
-      possibleMoves = getValidMovesBlack(boardArray);
-      players.black.emit('receivePossibleMoves', { possibleMoves });
-    }
-  }
   
   // Handle 'moveMade' event
   socket.on('moveMade', (messageData) => {
@@ -161,6 +165,7 @@ io.on('connection', async (socket) => {
 
     if (isValidMove) {
       // Perform the move
+      process.stdout.write(`${}`);
       movePieceServer(startX, startY, targetX, targetY);
 
       // Switch turns
@@ -347,3 +352,4 @@ function movePieceServer(startX, startY, targetX, targetY) {
   //   console.log('Invalid move!');
   // }
 }
+ 

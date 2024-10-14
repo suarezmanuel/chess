@@ -25,14 +25,6 @@ export const g = {
   prevY: null,
 };
 
-
-// export const whitePositions = new Map([[[0,6], 'p'], [[1,6], 'p'], [[2,6], 'p'], [[3,6], 'p'], [[4,6], 'p'], [[5,6], 'p'], [[6,6], 'p'], [[7,6], 'p'], 
-//     [[0,7], 'r'], [[1,7], 'n'], [[2,7], 'b'], [[3,7], 'q'], [[4,7], 'k'], [[5,7], 'b'], [[6,7], 'n'], [[7,7], 'r']]);
-
-// export const blackPositions = new Map([[[0,1], 'p'], [[1,1], 'p'], [[2,1], 'p'], [[3,1], 'p'], [[4,1], 'p'], [[5,1], 'p'], [[6,1], 'p'], [[7,1], 'p'], 
-//     [[0,0], 'r'], [[1,0], 'n'], [[2,0], 'b'], [[3,0], 'q'], [[4,0], 'k'], [[5,0], 'b'], [[6,0], 'n'], [[7,0], 'r']]);
-
-
 // up right down left
 let rookDirections  = [[0,-1], [1,0], [0,1], [-1,0]];
 // up-right bottom-right bottom-left up-left
@@ -40,16 +32,6 @@ let bishopDirections = [[1,-1], [1,1], [-1,1], [-1,-1]];
 // clock wise starting from up 
 let knightDirections = [[1,-2], [2,-1], [2,1], [1,2], [-1,2], [-2,1], [-2,-1], [-1,-2]];
 let kingDirections   = [[0,-1], [1,0], [0,1], [-1,0], [1,-1], [1,1], [-1,1], [-1,-1]];
-
-// export function getValidMovesWhite(board) {
-
-//     let moves = [];
-//     whitePositions.forEach((value, key) => {
-//         let a = getValidMoves(board, "w"+value, key[0], key[1]);
-//         moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
-//     });
-//     return moves;
-// }
 
 export function getValidMovesWhite(board) {
 
@@ -114,7 +96,7 @@ export function getValidMoves (board, piece, xPos, yPos) {
     let moves = [];
     // need to account for taking pieces
     switch (pieceType) {
-        case 'p': // Pawn move (basic example)
+        case 'p': // Pawn move
             moves = validMovesFromArray(board, xPos, yPos, pawnMoves(board, piece[0], xPos, yPos));
             break;
         case 'r': // Rook move
@@ -130,7 +112,7 @@ export function getValidMoves (board, piece, xPos, yPos) {
             moves = validMovesFromArray(board, xPos, yPos, queenMoves(board, piece[0], xPos, yPos));
             break;
         case 'k': // King move
-            moves = validMovesFromArray(board, xPos, yPos, kingMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, [...kingMoves(board, piece[0], xPos, yPos), ...castleMoves(board, piece[0])]);
             break;
     }
 
@@ -165,7 +147,7 @@ function pawnMoves(board, color, xPos, yPos) {
     }
     
     // en passant
-    if (!isBad(g.prevX) && !isBad(g.prevY) && xPos > 0 && xPos < 7 && checkPiece(board[g.prevY][g.prevX], 'p')) {
+    if (!isBad(g.prevX) && !isBad(g.prevY) && xPos >= 0 && xPos <= 7 && checkPiece(board[g.prevY][g.prevX], 'p')) {
         if (color == 'w') {
             if (yPos == 3 && g.prevY == 3) {
                 // prev is last target X
@@ -298,49 +280,30 @@ function kingMoves(board, color, xPos, yPos) {
             if (checkColor(board[yTemp][xTemp], oppColor)) continue;
         }
     }
-    return [...moves, ...castleMoves(board, color)];
+    return moves;
 }
 
 function castleMoves(board, color) {
-    // let moves = [];
-    // let hasKingMoved = color === 'w' ? hasWhiteKingMoved : hasBlackKingMoved;
-    // if (hasKingMoved || isInCheck(board, color, [4,color === 'w' ? 7 : 0])) return moves;
-    // if (color === 'w') {
-    //     if (!hasWhiteLeftRookMoved) {
-    //         if (board[7][0] === "wr" && isBad(board[7][1]) && isBad(board[7][2]) && isBad(board[7][3]) && !isInCheck(board, color, [7, 3])) moves.push([4, 7, 2, 7]);
-    //     }
-    //     if (!hasWhiteRightRookMoved) {
-    //         if (board[7][7] === "wr" && isBad(board[7][5]) && isBad(board[7][6]) && !isInCheck(board, color, [7, 5])) moves.push([4, 7, 6, 7]);
-    //     }
-    // } else {
-    //     if (!hasBlackLeftRookMoved) {
-    //         if (board[0][0] === "br" && isBad(board[0][1]) && isBad(board[0][2]) && isBad(board[0][3]) && !isInCheck(board, color, [0, 3])) moves.push([4, 0, 2, 0]);
-    //     }
-    //     if (!hasBlackRightRookMoved) {
-    //         if (board[0][7] === "br" && isBad(board[0][5]) && isBad(board[0][6]) && !isInCheck(board, color, [0, 5])) moves.push([4, 0, 6, 0]);
-    //     }
-    // }
-    // return moves;
     let moves = [];
     let hasKingMoved = color === 'w' ? g.hasWhiteKingMoved : g.hasBlackKingMoved;
-    if (hasKingMoved) return moves;
+    if (hasKingMoved || isInCheck(board, color, [4,color === 'w' ? 7 : 0])) return moves;
     if (color === 'w') {
         if (!g.hasWhiteLeftRookMoved) {
-            if (board[7][0] === "wr" && isBad(board[7][1]) && isBad(board[7][2]) && isBad(board[7][3])) moves.push([4, 7, 2, 7]);
+            if (board[7][0] === "wr" && isBad(board[7][1]) && isBad(board[7][2]) && isBad(board[7][3]) && !isInCheck(board, color, [3, 7])) moves.push([4, 7, 2, 7]);
         }
         if (!g.hasWhiteRightRookMoved) {
-            if (board[7][7] === "wr" && isBad(board[7][5]) && isBad(board[7][6])) moves.push([4, 7, 6, 7]);
+            if (board[7][7] === "wr" && isBad(board[7][5]) && isBad(board[7][6]) && !isInCheck(board, color, [5, 7])) moves.push([4, 7, 6, 7]);
         }
     } else {
         if (!g.hasBlackLeftRookMoved) {
-            if (board[0][0] === "br" && isBad(board[0][1]) && isBad(board[0][2]) && isBad(board[0][3])) moves.push([4, 0, 2, 0]);
+            if (board[0][0] === "br" && isBad(board[0][1]) && isBad(board[0][2]) && isBad(board[0][3]) && !isInCheck(board, color, [3, 0])) moves.push([4, 0, 2, 0]);
         }
         if (!g.hasBlackRightRookMoved) {
-            if (board[0][7] === "br" && isBad(board[0][5]) && isBad(board[0][6])) moves.push([4, 0, 6, 0]);
+            if (board[0][7] === "br" && isBad(board[0][5]) && isBad(board[0][6]) && !isInCheck(board, color, [5, 0])) moves.push([4, 0, 6, 0]);
         }
     }
     return moves;
-}
+   }
 
 export function isInCheck(board, color, kingPos) {
 
