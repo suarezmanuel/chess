@@ -21,8 +21,8 @@ export const g = {
   hasBlackRightRookMoved: false,
   hasBlackLeftRookMoved: false,
 
-//   prevX: null,
-//   prevY: null,
+  prevX: null,
+  prevY: null,
 };
 
 // up right down left
@@ -33,31 +33,31 @@ let bishopDirections = [[1,-1], [1,1], [-1,1], [-1,-1]];
 let knightDirections = [[1,-2], [2,-1], [2,1], [1,2], [-1,2], [-2,1], [-2,-1], [-1,-2]];
 let kingDirections   = [[0,-1], [1,0], [0,1], [-1,0], [1,-1], [1,1], [-1,1], [-1,-1]];
 
-export function getValidMovesWhite(board, prevX, prevY, whitePositions, blackPositions) {
+export function getValidMovesWhite(board, whitePositions, g) {
 
     let moves = [];
     whitePositions.forEach((value, key) => {
-        let a = getValidMoves(board, "w"+value, key[0], key[1], prevX, prevY);
-        moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
+        let a = getValidMoves(board, "w"+value, key[0], key[1], whitePositions, g);
+        moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a, whitePositions));
     });
     return moves;
 }
 
-export function getValidMovesBlack(board, prevX, prevY, whitePositions, blackPositions) {
+export function getValidMovesBlack(board, blackPositions, g) {
 
     let moves = [];
     blackPositions.forEach((value, key) => {
-        let a = getValidMoves(board, "b"+value, key[0], key[1], prevX, prevY);
-        moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
+        let a = getValidMoves(board, "b"+value, key[0], key[1], blackPositions, g);
+        moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a, blackPositions));
     });
     return moves;
 }
 
-export function validMovesFromArray(board, startX, startY, array) {
+export function validMovesFromArray(board, startX, startY, array, positions) {
     
     let color = board[startY][startX].charAt(0);
     let piece = board[startY][startX].charAt(1);
-    let positions = color === "w" ? whitePositions : blackPositions;
+    // let positions = color === "w" ? whitePositions : blackPositions;
     let kingPos = [];
     positions.forEach((value, key) => {
         if (value == 'k') kingPos = key;
@@ -90,29 +90,29 @@ function isBad(a) {
     return (a === undefined || a === null);
 }
 
-export function getValidMoves (board, piece, xPos, yPos, prevX, prevY) {
+export function getValidMoves (board, piece, xPos, yPos, positions, g) {
 
     const pieceType = piece.substring(1); // e.g., 'p' for pawn, 'r' for rook, etc.
     let moves = [];
     // need to account for taking pieces
     switch (pieceType) {
         case 'p': // Pawn move
-            moves = validMovesFromArray(board, xPos, yPos, pawnMoves(board, piece[0], xPos, yPos, prevX, prevY));
+            moves = validMovesFromArray(board, xPos, yPos, pawnMoves(board, piece[0], xPos, yPos, g), positions);
             break;
         case 'r': // Rook move
-            moves = validMovesFromArray(board, xPos, yPos, rookMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, rookMoves(board, piece[0], xPos, yPos), positions);
             break;
         case 'n': // Knight move
-            moves = validMovesFromArray(board, xPos, yPos, knightMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, knightMoves(board, piece[0], xPos, yPos), positions);
             break;
         case 'b': // Bishop move
-            moves = validMovesFromArray(board, xPos, yPos, bishopMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, bishopMoves(board, piece[0], xPos, yPos), positions);
             break;
         case 'q': // Queen move
-            moves = validMovesFromArray(board, xPos, yPos, queenMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, queenMoves(board, piece[0], xPos, yPos), positions);
             break;
         case 'k': // King move
-            moves = validMovesFromArray(board, xPos, yPos, [...kingMoves(board, piece[0], xPos, yPos), ...castleMoves(board, piece[0])]);
+            moves = validMovesFromArray(board, xPos, yPos, [...kingMoves(board, piece[0], xPos, yPos), ...castleMoves(board, piece[0], g)], positions);
             break;
     }
 
@@ -130,34 +130,34 @@ export function checkPiece(piece1, piece2) {
 }
 
 // no en pessant yet
-function pawnMoves(board, color, xPos, yPos, prevX, prevY) {
+function pawnMoves(board, color, xPos, yPos, g) {
 
     let moves = [];
     let oppColor = (color === 'w') ? 'b' : 'w';
+
     // can eat of the opposite color
-    
-    if (yPos-1 >= 0) {
-        if (color === 'w') {
-            if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos-1]);
-            if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos-1]);
-        } else {
-            if (xPos+1  < 8 && checkColor(board[yPos+1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos+1]);
-            if (xPos-1 >= 0 && checkColor(board[yPos+1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos+1]);
-        }
-    }
+    // if (yPos-1 >= 0) {
+    //     if (color === 'w') {
+    //         if (xPos+1  < 8 && checkColor(board[yPos-1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos-1]);
+    //         if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos-1]);
+    //     } else {
+    //         if (xPos+1  < 8 && checkColor(board[yPos+1][xPos+1], oppColor)) moves.push([xPos, yPos, xPos+1, yPos+1]);
+    //         if (xPos-1 >= 0 && checkColor(board[yPos+1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos+1]);
+    //     }
+    // }
     
     // en passant
-    if (!isBad(prevX) && !isBad(prevY) && xPos >= 0 && xPos <= 7 && checkPiece(board[prevY][prevX], 'p')) {
+    if (!isBad(g.prevX) && !isBad(g.prevY) && xPos >= 0 && xPos <= 7 && checkPiece(board[g.prevY][g.prevX], 'p')) {
         if (color == 'w') {
-            if (yPos == 3 && prevY == 3) {
+            if (yPos == 3 && g.prevY == 3) {
                 // prev is last target X
-                if (prevX == xPos-1 || prevX == xPos+1)
-                    moves.push([xPos, yPos, prevX, yPos-1]);
+                if (g.prevX == xPos-1 || g.prevX == xPos+1)
+                    moves.push([xPos, yPos, g.prevX, yPos-1]);
             }
         } else {
-            if (yPos == 4 && prevY == 4) {
-                if (prevX == xPos-1 || prevX == xPos+1)
-                    moves.push([xPos, yPos, prevX, yPos+1]);
+            if (yPos == 4 && g.prevY == 4) {
+                if (g.prevX == xPos-1 || g.prevX == xPos+1)
+                    moves.push([xPos, yPos, g.prevX, yPos+1]);
             }
         }
     }
@@ -169,7 +169,7 @@ function pawnMoves(board, color, xPos, yPos, prevX, prevY) {
             if (xPos-1 >= 0 && checkColor(board[yPos-1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos-1]);
         }
         // move twice at start
-        if (yPos == 6 && isBad(board[yPos-2][xPos])) moves.push([xPos, yPos, xPos, yPos-2]);
+        if (yPos == 6 && isBad(board[yPos-2][xPos]) && isBad(board[yPos-1][xPos])) moves.push([xPos, yPos, xPos, yPos-2]);
         // move once forward
         if (yPos > 0  && isBad(board[yPos-1][xPos])) moves.push([xPos, yPos, xPos, yPos-1]);
     // if black
@@ -180,12 +180,23 @@ function pawnMoves(board, color, xPos, yPos, prevX, prevY) {
             if (xPos-1 >= 0 && checkColor(board[yPos+1][xPos-1], oppColor)) moves.push([xPos, yPos, xPos-1, yPos+1]);
         }
         // move twice at start
-        if (yPos == 1 && isBad(board[yPos+2][xPos])) moves.push([xPos, yPos, xPos, yPos+2]);
+        if (yPos == 1 && isBad(board[yPos+2][xPos]) && isBad(board[yPos+1][xPos])) moves.push([xPos, yPos, xPos, yPos+2]);
         // move once forward
         if (yPos <  7 && isBad(board[yPos+1][xPos])) moves.push([xPos, yPos, xPos, yPos+1]);
     }
 
-    return moves;
+    let newMoves = [];
+    moves.forEach(move => {
+        if (move[3] === 7 || move[3] === 0) {
+            newMoves.push([...move, 'q']);
+            newMoves.push([...move, 'r']);
+            newMoves.push([...move, 'b']);
+            newMoves.push([...move, 'n']);
+        } else {
+            newMoves.push(move);
+        }
+    })
+    return newMoves;
 }
 
 function rookMoves(board, color, xPos, yPos) {
@@ -283,7 +294,7 @@ function kingMoves(board, color, xPos, yPos) {
     return moves;
 }
 
-function castleMoves(board, color) {
+function castleMoves(board, color, g) {
     let moves = [];
     let hasKingMoved = color === 'w' ? g.hasWhiteKingMoved : g.hasBlackKingMoved;
     if (hasKingMoved || isInCheck(board, color, [4,color === 'w' ? 7 : 0])) return moves;
