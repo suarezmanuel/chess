@@ -86,50 +86,50 @@ html, body {
 }
 
 .bp {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bp.png');
+    background-image: url('../resources/bp.png');
 }
 
 .br {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/br.png');
+    background-image: url('../resources/br.png');
 }
 
 .bn {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bn.png');
+    background-image: url('../resources/bn.png');
 }
 
 .bb {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bb.png');
+    background-image: url('../resources/bb.png');
 }
 
 .bk {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bk.png');
+    background-image: url('../resources/bk.png');
 }
 
 .bq {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/bq.png');
+    background-image: url('../resources/bq.png');
 }
 
 
 .wp {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wp.png');
+    background-image: url('../resources/wp.png');
 }
 
 .wr {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wr.png');
+    background-image: url('../resources/wr.png');
 }
 
 .wn {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wn.png');
+    background-image: url('../resources/wn.png');
 }
 
 .wb {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wb.png');
+    background-image: url('../resources/wb.png');
 }
 
 .wk {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wk.png');
+    background-image: url('../resources/wk.png');
 }
 
 .wq {
-    background-image: url('https://assets-themes.chess.com/image/ejgfv/150/wq.png');
+    background-image: url('../resources/wq.png');
 }

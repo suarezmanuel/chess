@@ -13,7 +13,7 @@ let gameEnded = false;
 let currentTurn = 'w';
 let draggedPiece = null;
 
-const socket = io('http://localhost:3000');
+const socket = io();
 
 // Extract the room code from the URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -244,7 +244,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // En passant
         if (piece === 'p') {
-            let y = targetY + 1;
+            let dir = targetY - startY;
+            let y = targetY - dir;
             if (Math.abs(targetX - startX) === 1) {
                 if (!capturedPiece) {
                     let capturedPawnClass = `square-${targetX + 1}${8 - y}`;

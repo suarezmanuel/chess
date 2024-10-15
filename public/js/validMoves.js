@@ -21,8 +21,8 @@ export const g = {
   hasBlackRightRookMoved: false,
   hasBlackLeftRookMoved: false,
 
-  prevX: null,
-  prevY: null,
+//   prevX: null,
+//   prevY: null,
 };
 
 // up right down left
@@ -33,21 +33,21 @@ let bishopDirections = [[1,-1], [1,1], [-1,1], [-1,-1]];
 let knightDirections = [[1,-2], [2,-1], [2,1], [1,2], [-1,2], [-2,1], [-2,-1], [-1,-2]];
 let kingDirections   = [[0,-1], [1,0], [0,1], [-1,0], [1,-1], [1,1], [-1,1], [-1,-1]];
 
-export function getValidMovesWhite(board) {
+export function getValidMovesWhite(board, prevX, prevY, whitePositions, blackPositions) {
 
     let moves = [];
     whitePositions.forEach((value, key) => {
-        let a = getValidMoves(board, "w"+value, key[0], key[1], g.prevX, g.prevY);
+        let a = getValidMoves(board, "w"+value, key[0], key[1], prevX, prevY);
         moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
     });
     return moves;
 }
 
-export function getValidMovesBlack(board) {
+export function getValidMovesBlack(board, prevX, prevY, whitePositions, blackPositions) {
 
     let moves = [];
     blackPositions.forEach((value, key) => {
-        let a = getValidMoves(board, "b"+value, key[0], key[1], g.prevX, g.prevY);
+        let a = getValidMoves(board, "b"+value, key[0], key[1], prevX, prevY);
         moves.push.apply(moves, validMovesFromArray(board, key[0], key[1], a));
     });
     return moves;
@@ -90,14 +90,14 @@ function isBad(a) {
     return (a === undefined || a === null);
 }
 
-export function getValidMoves (board, piece, xPos, yPos) {
+export function getValidMoves (board, piece, xPos, yPos, prevX, prevY) {
 
     const pieceType = piece.substring(1); // e.g., 'p' for pawn, 'r' for rook, etc.
     let moves = [];
     // need to account for taking pieces
     switch (pieceType) {
         case 'p': // Pawn move
-            moves = validMovesFromArray(board, xPos, yPos, pawnMoves(board, piece[0], xPos, yPos));
+            moves = validMovesFromArray(board, xPos, yPos, pawnMoves(board, piece[0], xPos, yPos, prevX, prevY));
             break;
         case 'r': // Rook move
             moves = validMovesFromArray(board, xPos, yPos, rookMoves(board, piece[0], xPos, yPos));
@@ -130,7 +130,7 @@ export function checkPiece(piece1, piece2) {
 }
 
 // no en pessant yet
-function pawnMoves(board, color, xPos, yPos) {
+function pawnMoves(board, color, xPos, yPos, prevX, prevY) {
 
     let moves = [];
     let oppColor = (color === 'w') ? 'b' : 'w';
@@ -147,17 +147,17 @@ function pawnMoves(board, color, xPos, yPos) {
     }
     
     // en passant
-    if (!isBad(g.prevX) && !isBad(g.prevY) && xPos >= 0 && xPos <= 7 && checkPiece(board[g.prevY][g.prevX], 'p')) {
+    if (!isBad(prevX) && !isBad(prevY) && xPos >= 0 && xPos <= 7 && checkPiece(board[prevY][prevX], 'p')) {
         if (color == 'w') {
-            if (yPos == 3 && g.prevY == 3) {
+            if (yPos == 3 && prevY == 3) {
                 // prev is last target X
-                if (g.prevX == xPos-1 || g.prevX == xPos+1)
-                    moves.push([xPos, yPos, g.prevX, yPos-1]);
+                if (prevX == xPos-1 || prevX == xPos+1)
+                    moves.push([xPos, yPos, prevX, yPos-1]);
             }
         } else {
-            if (yPos == 4 && g.prevY == 4) {
-                if (g.prevX == xPos-1 || g.prevX == xPos+1)
-                    moves.push([xPos, yPos, g.prevX, yPos+1]);
+            if (yPos == 4 && prevY == 4) {
+                if (prevX == xPos-1 || prevX == xPos+1)
+                    moves.push([xPos, yPos, prevX, yPos+1]);
             }
         }
     }
@@ -303,7 +303,7 @@ function castleMoves(board, color) {
         }
     }
     return moves;
-   }
+}
 
 export function isInCheck(board, color, kingPos) {
 

@@ -1,7 +1,7 @@
 import { io } from 'https://cdn.socket.io/4.5.4/socket.io.esm.min.js';
 
 export function connectBot() {
-    const socket = io('http://localhost:3000');
+    const socket = io();
     socket.emit('joinRoom', 807);
     
     let color = null;
