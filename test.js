@@ -62,8 +62,8 @@ function help (board, whitePositions, blackPositions, turn, oppTurn, depth, g) {
         movePieceServer(board, move, whitePositions, blackPositions, g);
 
         help(board, whitePositions, blackPositions, oppTurn, turn, depth-1, g);
-        if (depth == 1) {
-          //console.log(`${String.fromCharCode(97 + +move[0])}${8 - +move[1]}${String.fromCharCode(97 + +move[2])}${8 - +move[3]}${move[4] ? move[4] : ''}: ${local_count}`);
+        if (depth == 4) {
+          console.log(`${String.fromCharCode(97 + +move[0])}${8 - +move[1]}${String.fromCharCode(97 + +move[2])}${8 - +move[3]}${move[4] ? move[4] : ''}: ${local_count}`);
           local_count = 0;
         }
         // undo move
@@ -72,9 +72,9 @@ function help (board, whitePositions, blackPositions, turn, oppTurn, depth, g) {
     });
 }
 
-perft('rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8', 4);
+//perft('rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8', 4);
 // perft('rnbq1k1r/pp1Pbppp/2p4B/8/2B5/8/PPP1NnPP/RN1QK2R b KQ - 1 8', 1);
-console.log(count);
+//console.log(count);
 
 function getBoardFromFen(fen) {
     let board = [
@@ -213,8 +213,6 @@ export function movePieceServer(boardArray, move, whitePositions, blackPositions
   positions.forEach((value, key) => {
     if (value === 'k') kingPos = key;
   });
-
-
 }
 
 export function undoMoveServer(boardArray, startX, startY, targetX, targetY, whitePositions, blackPositions, g, eaten, pieceType) {

@@ -1,76 +1,7 @@
-#include <iostream>
-#include <vector>
-#include <map>
-#include <string>
-#include <algorithm>
+#include "./main.h"
 
-struct Position {
-    int x;
-    int y;
-
-    bool operator<(const Position& other) const {
-        return std::tie(x, y) < std::tie(other.x, other.y);
-    }
-};
-
-// Initial positions for white pieces
-std::map<Position, char> whitePositions = {
-    {{0, 6}, 'p'}, {{1, 6}, 'p'}, {{2, 6}, 'p'}, {{3, 6}, 'p'},
-    {{4, 6}, 'p'}, {{5, 6}, 'p'}, {{6, 6}, 'p'}, {{7, 6}, 'p'},
-    {{0, 7}, 'r'}, {{1, 7}, 'n'}, {{2, 7}, 'b'}, {{3, 7}, 'q'},
-    {{4, 7}, 'k'}, {{5, 7}, 'b'}, {{6, 7}, 'n'}, {{7, 7}, 'r'}
-};
-
-// Initial positions for black pieces
-std::map<Position, char> blackPositions = {
-    {{0, 1}, 'p'}, {{1, 1}, 'p'}, {{2, 1}, 'p'}, {{3, 1}, 'p'},
-    {{4, 1}, 'p'}, {{5, 1}, 'p'}, {{6, 1}, 'p'}, {{7, 1}, 'p'},
-    {{0, 0}, 'r'}, {{1, 0}, 'n'}, {{2, 0}, 'b'}, {{3, 0}, 'q'},
-    {{4, 0}, 'k'}, {{5, 0}, 'b'}, {{6, 0}, 'n'}, {{7, 0}, 'r'}
-};
-
-struct GameState {
-    bool hasWhiteKingMoved = false;
-    bool hasWhiteRightRookMoved = false;
-    bool hasWhiteLeftRookMoved = false;
-
-    bool hasBlackKingMoved = false;
-    bool hasBlackRightRookMoved = false;
-    bool hasBlackLeftRookMoved = false;
-
-    int prevX = -1;
-    int prevY = -1;
-};
-
-GameState g;
-
-// Direction vectors for different pieces
-std::vector<std::pair<int, int>> rookDirections = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
-std::vector<std::pair<int, int>> bishopDirections = {{1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
-std::vector<std::pair<int, int>> knightDirections = {{1, -2}, {2, -1}, {2, 1}, {1, 2},
-                                                     {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}};
-std::vector<std::pair<int, int>> kingDirections = {{0, -1}, {1, 0}, {0, 1}, {-1, 0},
-                                                   {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
-
-// Function declarations
-std::vector<std::vector<int>> getValidMovesWhite(std::vector<std::vector<std::string>>& board);
-std::vector<std::vector<int>> getValidMovesBlack(std::vector<std::vector<std::string>>& board);
-std::vector<std::vector<int>> validMovesFromArray(std::vector<std::vector<std::string>>& board, int startX, int startY, const std::vector<std::vector<int>>& array);
-bool isBad(const std::string& a);
-std::vector<std::vector<int>> getValidMoves(std::vector<std::vector<std::string>>& board, const std::string& piece, int xPos, int yPos);
-bool checkColor(const std::string& piece, char color);
-bool checkPiece(const std::string& piece, char pieceType);
-std::vector<std::vector<int>> pawnMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> rookMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> knightMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> bishopMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> queenMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> kingMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos);
-std::vector<std::vector<int>> castleMoves(std::vector<std::vector<std::string>>& board, char color);
-bool isInCheck(std::vector<std::vector<std::string>>& board, char color, Position kingPos);
-
-bool isBad(const std::string& a) {
-    return a.empty();
+inline bool isBad(const std::string& piece) {
+    return piece.empty();
 }
 
 bool checkColor(const std::string& piece, char color) {
@@ -83,318 +14,77 @@ bool checkPiece(const std::string& piece, char pieceType) {
     return piece[1] == pieceType;
 }
 
-// Implementations
-std::vector<std::vector<int>> getValidMovesWhite(std::vector<std::vector<std::string>>& board) {
-    std::vector<std::vector<int>> moves;
-    for (const auto& entry : whitePositions) {
-        Position pos = entry.first;
-        char value = entry.second;
-        std::string piece = "w";
-        piece += value;
-        std::vector<std::vector<int>> a = getValidMoves(board, piece, pos.x, pos.y);
-        std::vector<std::vector<int>> validMoves = validMovesFromArray(board, pos.x, pos.y, a);
-        moves.insert(moves.end(), validMoves.begin(), validMoves.end());
-    }
-    return moves;
+void deleteFromMap(PositionsMap& positions, const std::pair<int, int>& key) {
+    positions.erase(key);
 }
 
-std::vector<std::vector<int>> getValidMovesBlack(std::vector<std::vector<std::string>>& board) {
-    std::vector<std::vector<int>> moves;
-    for (const auto& entry : blackPositions) {
-        Position pos = entry.first;
-        char value = entry.second;
-        std::string piece = "b";
-        piece += value;
-        std::vector<std::vector<int>> a = getValidMoves(board, piece, pos.x, pos.y);
-        std::vector<std::vector<int>> validMoves = validMovesFromArray(board, pos.x, pos.y, a);
-        moves.insert(moves.end(), validMoves.begin(), validMoves.end());
-    }
-    return moves;
-}
+bool isInCheck(BoardType& board, char color, const std::pair<int, int>& kingPos) {
+    int xPos = kingPos.first;
+    int yPos = kingPos.second;
+    char oppColor = (color == 'w') ? 'b' : 'w';
 
-std::vector<std::vector<int>> validMovesFromArray(std::vector<std::vector<std::string>>& board, int startX, int startY, const std::vector<std::vector<int>>& array) {
-    char color = board[startY][startX][0];
-    char piece = board[startY][startX][1];
-
-    std::map<Position, char>& positions = (color == 'w') ? whitePositions : blackPositions;
-
-    Position kingPos;
-
-    for (const auto& entry : positions) {
-        if (entry.second == 'k') {
-            kingPos = entry.first;
-            break;
+    // Knight attacks
+    std::vector<Move> knightAttacks;
+    for (const auto& dir : knightDirections) {
+        int x = xPos + dir.first;
+        int y = yPos + dir.second;
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+            if (checkColor(board[y][x], oppColor) && checkPiece(board[y][x], 'n')) {
+                return true;
+            }
         }
     }
 
-    std::vector<std::vector<int>> moves;
-
-    for (const auto& move : array) {
-        std::string temp = board[move[3]][move[2]];
-
-        // start
-        board[startY][startX] = "";
-
-        // target
-        board[move[3]][move[2]] = std::string(1, color) + piece;
-
-        if (piece == 'k') {
-            kingPos.x = move[2];
-            kingPos.y = move[3];
-        }
-
-        if (!isInCheck(board, color, kingPos)) {
-            // Check if move is already in moves
-            bool alreadyExists = false;
-            for (const auto& m : moves) {
-                if (m[0] == move[2] && m[1] == move[3]) {
-                    alreadyExists = true;
+    // Rook and Queen attacks (horizontal and vertical)
+    for (const auto& dir : rookDirections) {
+        int x = xPos;
+        int y = yPos;
+        while (true) {
+            x += dir.first;
+            y += dir.second;
+            if (x < 0 || x >= 8 || y < 0 || y >= 8) break;
+            if (checkColor(board[y][x], color)) break;
+            if (checkColor(board[y][x], oppColor)) {
+                if (checkPiece(board[y][x], 'r') || checkPiece(board[y][x], 'q')) {
+                    return true;
+                } else {
                     break;
                 }
             }
-            if (!alreadyExists) {
-                moves.push_back(move);
-            }
-        }
-
-        // Undo the move
-        board[startY][startX] = std::string(1, color) + piece;
-        if (piece == 'k') {
-            kingPos.x = startX;
-            kingPos.y = startY;
-        }
-        board[move[3]][move[2]] = temp;
-    }
-    return moves;
-}
-
-std::vector<std::vector<int>> getValidMoves(std::vector<std::vector<std::string>>& board, const std::string& piece, int xPos, int yPos) {
-    char pieceType = piece[1]; // e.g., 'p' for pawn, 'r' for rook, etc.
-    std::vector<std::vector<int>> moves;
-    switch (pieceType) {
-        case 'p': // Pawn move
-            moves = pawnMoves(board, piece[0], xPos, yPos);
-            break;
-        case 'r': // Rook move
-            moves = rookMoves(board, piece[0], xPos, yPos);
-            break;
-        case 'n': // Knight move
-            moves = knightMoves(board, piece[0], xPos, yPos);
-            break;
-        case 'b': // Bishop move
-            moves = bishopMoves(board, piece[0], xPos, yPos);
-            break;
-        case 'q': // Queen move
-            moves = queenMoves(board, piece[0], xPos, yPos);
-            break;
-        case 'k': // King move
-            {
-                std::vector<std::vector<int>> king_moves = kingMoves(board, piece[0], xPos, yPos);
-                std::vector<std::vector<int>> castle_moves = castleMoves(board, piece[0]);
-                king_moves.insert(king_moves.end(), castle_moves.begin(), castle_moves.end());
-                moves = king_moves;
-            }
-            break;
-    }
-    return moves;
-}
-
-// Pawn moves including en passant
-std::vector<std::vector<int>> pawnMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
-    int direction = (color == 'w') ? -1 : 1;
-    int startRow = (color == 'w') ? 6 : 1;
-
-    // Forward moves
-    int newY = yPos + direction;
-    if (newY >= 0 && newY < 8 && isBad(board[newY][xPos])) {
-        moves.push_back({xPos, yPos, xPos, newY});
-        // Double move from starting position
-        if (yPos == startRow && isBad(board[yPos + 2 * direction][xPos])) {
-            moves.push_back({xPos, yPos, xPos, yPos + 2 * direction});
         }
     }
 
-    // Captures
-    for (int dx = -1; dx <= 1; dx += 2) {
-        int newX = xPos + dx;
-        if (newX >= 0 && newX < 8 && newY >= 0 && newY < 8) {
-            if (checkColor(board[newY][newX], oppColor)) {
-                moves.push_back({xPos, yPos, newX, newY});
-            }
-        }
-    }
-
-    // En passant
-    if (g.prevX != -1 && g.prevY != -1 && checkPiece(board[g.prevY][g.prevX], 'p')) {
-        if (abs(g.prevY - yPos) == 0 && abs(g.prevX - xPos) == 1) {
-            int enPassantRow = (color == 'w') ? 3 : 4;
-            if (yPos == enPassantRow) {
-                moves.push_back({xPos, yPos, g.prevX, yPos + direction});
-            }
-        }
-    }
-
-    return moves;
-}
-
-// Rook moves
-std::vector<std::vector<int>> rookMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
-    for (const auto& dir : rookDirections) {
-        int xTemp = xPos;
-        int yTemp = yPos;
-        while (true) {
-            xTemp += dir.first;
-            yTemp += dir.second;
-            if (xTemp < 0 || xTemp >= 8 || yTemp < 0 || yTemp >= 8) break;
-            if (checkColor(board[yTemp][xTemp], color)) break;
-            moves.push_back({xPos, yPos, xTemp, yTemp});
-            if (checkColor(board[yTemp][xTemp], oppColor)) break;
-        }
-    }
-
-    return moves;
-}
-
-// Knight moves
-std::vector<std::vector<int>> knightMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
-    for (const auto& dir : knightDirections) {
-        int xTemp = xPos + dir.first;
-        int yTemp = yPos + dir.second;
-        if (xTemp < 0 || xTemp >= 8 || yTemp < 0 || yTemp >= 8) continue;
-        if (checkColor(board[yTemp][xTemp], color)) continue;
-        moves.push_back({xPos, yPos, xTemp, yTemp});
-    }
-
-    return moves;
-}
-
-// Bishop moves
-std::vector<std::vector<int>> bishopMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
+    // Bishop and Queen attacks (diagonals)
     for (const auto& dir : bishopDirections) {
-        int xTemp = xPos;
-        int yTemp = yPos;
+        int x = xPos;
+        int y = yPos;
         while (true) {
-            xTemp += dir.first;
-            yTemp += dir.second;
-            if (xTemp < 0 || xTemp >= 8 || yTemp < 0 || yTemp >= 8) break;
-            if (checkColor(board[yTemp][xTemp], color)) break;
-            moves.push_back({xPos, yPos, xTemp, yTemp});
-            if (checkColor(board[yTemp][xTemp], oppColor)) break;
+            x += dir.first;
+            y += dir.second;
+            if (x < 0 || x >= 8 || y < 0 || y >= 8) break;
+            if (checkColor(board[y][x], color)) break;
+            if (checkColor(board[y][x], oppColor)) {
+                if (checkPiece(board[y][x], 'b') || checkPiece(board[y][x], 'q')) {
+                    return true;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
-    return moves;
-}
-
-// Queen moves (combination of rook and bishop)
-std::vector<std::vector<int>> queenMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves = rookMoves(board, color, xPos, yPos);
-    std::vector<std::vector<int>> bishop_moves = bishopMoves(board, color, xPos, yPos);
-    moves.insert(moves.end(), bishop_moves.begin(), bishop_moves.end());
-    return moves;
-}
-
-// King moves
-std::vector<std::vector<int>> kingMoves(std::vector<std::vector<std::string>>& board, char color, int xPos, int yPos) {
-    std::vector<std::vector<int>> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
+    // King attacks
     for (const auto& dir : kingDirections) {
-        int xTemp = xPos + dir.first;
-        int yTemp = yPos + dir.second;
-        if (xTemp < 0 || xTemp >= 8 || yTemp < 0 || yTemp >= 8) continue;
-        if (checkColor(board[yTemp][xTemp], color)) continue;
-        moves.push_back({xPos, yPos, xTemp, yTemp});
-    }
-
-    return moves;
-}
-
-// Castling moves
-std::vector<std::vector<int>> castleMoves(std::vector<std::vector<std::string>>& board, char color) {
-    std::vector<std::vector<int>> moves;
-    bool hasKingMoved = (color == 'w') ? g.hasWhiteKingMoved : g.hasBlackKingMoved;
-    int row = (color == 'w') ? 7 : 0;
-
-    if (hasKingMoved || isInCheck(board, color, {4, row})) return moves;
-
-    if (color == 'w') {
-        if (!g.hasWhiteLeftRookMoved) {
-            if (board[row][0] == "wr" && isBad(board[row][1]) && isBad(board[row][2]) && isBad(board[row][3]) && !isInCheck(board, color, {3, row}))
-                moves.push_back({4, row, 2, row});
-        }
-        if (!g.hasWhiteRightRookMoved) {
-            if (board[row][7] == "wr" && isBad(board[row][5]) && isBad(board[row][6]) && !isInCheck(board, color, {5, row}))
-                moves.push_back({4, row, 6, row});
-        }
-    } else {
-        if (!g.hasBlackLeftRookMoved) {
-            if (board[row][0] == "br" && isBad(board[row][1]) && isBad(board[row][2]) && isBad(board[row][3]) && !isInCheck(board, color, {3, row}))
-                moves.push_back({4, row, 2, row});
-        }
-        if (!g.hasBlackRightRookMoved) {
-            if (board[row][7] == "br" && isBad(board[row][5]) && isBad(board[row][6]) && !isInCheck(board, color, {5, row}))
-                moves.push_back({4, row, 6, row});
+        int x = xPos + dir.first;
+        int y = yPos + dir.second;
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+            if (checkColor(board[y][x], oppColor) && checkPiece(board[y][x], 'k')) {
+                return true;
+            }
         }
     }
 
-    return moves;
-}
-
-// Check if the king is in check
-bool isInCheck(std::vector<std::vector<std::string>>& board, char color, Position kingPos) {
-    int xPos = kingPos.x;
-    int yPos = kingPos.y;
-
-    char oppColor = (color == 'w') ? 'b' : 'w';
-
-    // Knight threats
-    std::vector<std::vector<int>> knight_moves = knightMoves(board, color, xPos, yPos);
-    for (const auto& move : knight_moves) {
-        if (checkColor(board[move[3]][move[2]], oppColor) && checkPiece(board[move[3]][move[2]], 'n')) {
-            return true;
-        }
-    }
-
-    // Rook and Queen threats
-    std::vector<std::vector<int>> rook_moves = rookMoves(board, color, xPos, yPos);
-    for (const auto& move : rook_moves) {
-        if (checkColor(board[move[3]][move[2]], oppColor) &&
-            (checkPiece(board[move[3]][move[2]], 'r') || checkPiece(board[move[3]][move[2]], 'q'))) {
-            return true;
-        }
-    }
-
-    // Bishop and Queen threats
-    std::vector<std::vector<int>> bishop_moves = bishopMoves(board, color, xPos, yPos);
-    for (const auto& move : bishop_moves) {
-        if (checkColor(board[move[3]][move[2]], oppColor) &&
-            (checkPiece(board[move[3]][move[2]], 'b') || checkPiece(board[move[3]][move[2]], 'q'))) {
-            return true;
-        }
-    }
-
-    // King threats
-    std::vector<std::vector<int>> king_moves = kingMoves(board, color, xPos, yPos);
-    for (const auto& move : king_moves) {
-        if (checkColor(board[move[3]][move[2]], oppColor) && checkPiece(board[move[3]][move[2]], 'k')) {
-            return true;
-        }
-    }
-
-    // Pawn threats
+    // Pawn attacks
     int direction = (color == 'w') ? -1 : 1;
     for (int dx = -1; dx <= 1; dx += 2) {
         int x = xPos + dx;
@@ -409,33 +99,268 @@ bool isInCheck(std::vector<std::vector<std::string>>& board, char color, Positio
     return false;
 }
 
-int main() {
-    // Initialize the board as an 8x8 vector of strings
-    std::vector<std::vector<std::string>> board(8, std::vector<std::string>(8, ""));
-
-    // Place white pieces
-    for (const auto& entry : whitePositions) {
-        Position pos = entry.first;
-        char piece = entry.second;
-        board[pos.y][pos.x] = "w";
-        board[pos.y][pos.x] += piece;
+std::vector<Move> validMovesFromArray(BoardType& board, int startX, int startY, const std::vector<Move>& movesArray, PositionsMap& positions, char color) {
+    char piece = board[startY][startX][1];
+    std::pair<int, int> kingPos;
+    for (const auto& [key, value] : positions) {
+        if (value == 'k') {
+            kingPos = key;
+            break;
+        }
     }
 
-    // Place black pieces
-    for (const auto& entry : blackPositions) {
-        Position pos = entry.first;
-        char piece = entry.second;
-        board[pos.y][pos.x] = "b";
-        board[pos.y][pos.x] += piece;
+    std::vector<Move> validMoves;
+
+    for (const auto& move : movesArray) {
+        std::string temp = board[move.targetY][move.targetX];
+
+        // Make the move
+        board[startY][startX] = "";
+        board[move.targetY][move.targetX] = std::string(1, color) + piece;
+
+        std::pair<int, int> newKingPos = kingPos;
+        if (piece == 'k') {
+            newKingPos = {move.targetX, move.targetY};
+        }
+
+        if (!isInCheck(board, color, newKingPos)) {
+            validMoves.push_back(move);
+        }
+
+        // Undo the move
+        board[startY][startX] = std::string(1, color) + piece;
+        board[move.targetY][move.targetX] = temp;
     }
 
-    // Example usage: get valid moves for white
-    std::vector<std::vector<int>> whiteMoves = getValidMovesWhite(board);
+    return validMoves;
+}
 
-    // Output the moves
-    for (const auto& move : whiteMoves) {
-        std::cout << "From (" << move[0] << ", " << move[1] << ") to (" << move[2] << ", " << move[3] << ")\n";
+std::vector<Move> pawnMoves(BoardType& board, char color, int xPos, int yPos, GameData& g) {
+    std::vector<Move> moves;
+    char oppColor = (color == 'w') ? 'b' : 'w';
+    int direction = (color == 'w') ? -1 : 1;
+    int startRow = (color == 'w') ? 6 : 1;
+
+    // Single forward move
+    if (yPos + direction >= 0 && yPos + direction < 8 && isBad(board[yPos + direction][xPos])) {
+        moves.push_back({xPos, yPos, xPos, yPos + direction});
+
+        // Double forward move from starting position
+        if (yPos == startRow && isBad(board[yPos + 2 * direction][xPos])) {
+            moves.push_back({xPos, yPos, xPos, yPos + 2 * direction});
+        }
     }
 
-    return 0;
+    // Captures
+    for (int dx = -1; dx <= 1; dx += 2) {
+        int x = xPos + dx;
+        int y = yPos + direction;
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+            if (checkColor(board[y][x], oppColor)) {
+                moves.push_back({xPos, yPos, x, y});
+            }
+        }
+    }
+
+    // En passant
+    if (g.prevX != -1 && g.prevY != -1 && checkPiece(board[g.prevY][g.prevX], 'p')) {
+        if (abs(g.prevX - xPos) == 1 && g.prevY == yPos) {
+            if (yPos == (color == 'w' ? 3 : 4)) {
+                int targetY = yPos + direction;
+                moves.push_back({xPos, yPos, g.prevX, targetY});
+            }
+        }
+    }
+
+    // Pawn promotion
+    std::vector<Move> promotionMoves;
+    for (auto& move : moves) {
+        if (move.targetY == 0 || move.targetY == 7) {
+            for (char promo : {'q', 'r', 'b', 'n'}) {
+                Move promoMove = move;
+                promoMove.promotion = promo;
+                promotionMoves.push_back(promoMove);
+            }
+        } else {
+            move.promotion = '\0';
+            promotionMoves.push_back(move);
+        }
+    }
+
+    return promotionMoves;
+}
+
+std::vector<Move> rookMoves(BoardType& board, char color, int xPos, int yPos) {
+    std::vector<Move> moves;
+    char oppColor = (color == 'w') ? 'b' : 'w';
+
+    for (const auto& dir : rookDirections) {
+        int x = xPos;
+        int y = yPos;
+        while (true) {
+            x += dir.first;
+            y += dir.second;
+            if (x < 0 || x >= 8 || y < 0 || y >= 8) break;
+            if (checkColor(board[y][x], color)) break;
+            moves.push_back({xPos, yPos, x, y});
+            if (checkColor(board[y][x], oppColor)) break;
+        }
+    }
+    return moves;
+}
+
+std::vector<Move> knightMoves(BoardType& board, char color, int xPos, int yPos) {
+    std::vector<Move> moves;
+    char oppColor = (color == 'w') ? 'b' : 'w';
+
+    for (const auto& dir : knightDirections) {
+        int x = xPos + dir.first;
+        int y = yPos + dir.second;
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+            if (!checkColor(board[y][x], color)) {
+                moves.push_back({xPos, yPos, x, y});
+            }
+        }
+    }
+    return moves;
+}
+
+std::vector<Move> bishopMoves(BoardType& board, char color, int xPos, int yPos) {
+    std::vector<Move> moves;
+    char oppColor = (color == 'w') ? 'b' : 'w';
+
+    for (const auto& dir : bishopDirections) {
+        int x = xPos;
+        int y = yPos;
+        while (true) {
+            x += dir.first;
+            y += dir.second;
+            if (x < 0 || x >= 8 || y < 0 || y >= 8) break;
+            if (checkColor(board[y][x], color)) break;
+            moves.push_back({xPos, yPos, x, y});
+            if (checkColor(board[y][x], oppColor)) break;
+        }
+    }
+    return moves;
+}
+
+std::vector<Move> queenMoves(BoardType& board, char color, int xPos, int yPos) {
+    std::vector<Move> moves = rookMoves(board, color, xPos, yPos);
+    std::vector<Move> bishopMovesList = bishopMoves(board, color, xPos, yPos);
+    moves.insert(moves.end(), bishopMovesList.begin(), bishopMovesList.end());
+    return moves;
+}
+
+std::vector<Move> castleMoves(BoardType& board, char color, GameData& g) {
+    std::vector<Move> moves;
+    int yPos = (color == 'w') ? 7 : 0;
+    bool hasKingMoved = (color == 'w') ? g.hasWhiteKingMoved : g.hasBlackKingMoved;
+    if (hasKingMoved || isInCheck(board, color, {4, yPos})) return moves;
+
+    if (color == 'w') {
+        // Queenside castling
+        if (!g.hasWhiteLeftRookMoved) {
+            if (board[yPos][0] == "wr" && isBad(board[yPos][1]) && isBad(board[yPos][2]) && isBad(board[yPos][3]) && !isInCheck(board, color, {3, yPos})) {
+                moves.push_back({4, yPos, 2, yPos});
+            }
+        }
+        // Kingside castling
+        if (!g.hasWhiteRightRookMoved) {
+            if (board[yPos][7] == "wr" && isBad(board[yPos][5]) && isBad(board[yPos][6]) && !isInCheck(board, color, {5, yPos})) {
+                moves.push_back({4, yPos, 6, yPos});
+            }
+        }
+    } else {
+        // Queenside castling
+        if (!g.hasBlackLeftRookMoved) {
+            if (board[yPos][0] == "br" && isBad(board[yPos][1]) && isBad(board[yPos][2]) && isBad(board[yPos][3]) && !isInCheck(board, color, {3, yPos})) {
+                moves.push_back({4, yPos, 2, yPos});
+            }
+        }
+        // Kingside castling
+        if (!g.hasBlackRightRookMoved) {
+            if (board[yPos][7] == "br" && isBad(board[yPos][5]) && isBad(board[yPos][6]) && !isInCheck(board, color, {5, yPos})) {
+                moves.push_back({4, yPos, 6, yPos});
+            }
+        }
+    }
+    return moves;
+}
+
+std::vector<Move> kingMoves(BoardType& board, char color, int xPos, int yPos, GameData& g) {
+    std::vector<Move> moves;
+    char oppColor = (color == 'w') ? 'b' : 'w';
+
+    // Normal king moves
+    for (const auto& dir : kingDirections) {
+        int x = xPos + dir.first;
+        int y = yPos + dir.second;
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+            if (!checkColor(board[y][x], color)) {
+                moves.push_back({xPos, yPos, x, y});
+            }
+        }
+    }
+
+    // Castling
+    std::vector<Move> castlingMoves = castleMoves(board, color, g);
+    moves.insert(moves.end(), castlingMoves.begin(), castlingMoves.end());
+
+    return moves;
+}
+
+std::vector<Move> getValidMoves(BoardType& board, const std::string& piece, int xPos, int yPos, PositionsMap& positions, GameData& g) {
+    char pieceType = piece[1];
+    char color = piece[0];
+    std::vector<Move> moves;
+
+    switch (pieceType) {
+        case 'p':
+            moves = pawnMoves(board, color, xPos, yPos, g);
+            break;
+        case 'r':
+            moves = rookMoves(board, color, xPos, yPos);
+            break;
+        case 'n':
+            moves = knightMoves(board, color, xPos, yPos);
+            break;
+        case 'b':
+            moves = bishopMoves(board, color, xPos, yPos);
+            break;
+        case 'q':
+            moves = queenMoves(board, color, xPos, yPos);
+            break;
+        case 'k':
+            moves = kingMoves(board, color, xPos, yPos, g);
+            break;
+    }
+
+    // Filter moves that don't put the king in check
+    moves = validMovesFromArray(board, xPos, yPos, moves, positions, color);
+
+    return moves;
+}
+
+std::vector<Move> getValidMovesWhite(BoardType& board, PositionsMap& whitePositions, GameData& g) {
+    std::vector<Move> moves;
+    for (const auto& [key, value] : whitePositions) {
+        int x = key.first;
+        int y = key.second;
+        std::string pieceStr = "w" + std::string(1, value);
+        std::vector<Move> pieceMoves = getValidMoves(board, pieceStr, x, y, whitePositions, g);
+        moves.insert(moves.end(), pieceMoves.begin(), pieceMoves.end());
+    }
+    return moves;
+}
+
+std::vector<Move> getValidMovesBlack(BoardType& board, PositionsMap& blackPositions, GameData& g) {
+    std::vector<Move> moves;
+    for (const auto& [key, value] : blackPositions) {
+        int x = key.first;
+        int y = key.second;
+        std::string pieceStr = "b" + std::string(1, value);
+        std::vector<Move> pieceMoves = getValidMoves(board, pieceStr, x, y, blackPositions, g);
+        moves.insert(moves.end(), pieceMoves.begin(), pieceMoves.end());
+    }
+    return moves;
 }
