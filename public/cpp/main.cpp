@@ -2,7 +2,8 @@
 #include "validMoves.cpp"
 using namespace std;
 
-void undoMoveServer(BoardType& boardArray, int startX, int startY, int targetX, int targetY, PositionsMap& whitePositions, PositionsMap& blackPositions, GameData& g, const std::string& eaten, char pieceType) {
+// only restores the board, not g
+void undoMoveServer(string boardArray[8][8], int startX, int startY, int targetX, int targetY, PositionsMap& whitePositions, PositionsMap& blackPositions, GameData& g, const std::string& eaten, char pieceType) {
     std::string pieceStr = boardArray[targetY][targetX];
     char piece = pieceStr[1];
     char color = pieceStr[0];
@@ -73,7 +74,7 @@ void undoMoveServer(BoardType& boardArray, int startX, int startY, int targetX, 
     boardArray[targetY][targetX] = eaten;
 }
 
-void movePieceServer(BoardType& boardArray, const Move& move, PositionsMap& whitePositions, PositionsMap& blackPositions, GameData& g) {
+void movePieceServer(string boardArray[8][8], const Move& move, PositionsMap& whitePositions, PositionsMap& blackPositions, GameData& g) {
     int startX = move.startX;
     int startY = move.startY;
     int targetX = move.targetX;
@@ -103,12 +104,16 @@ void movePieceServer(BoardType& boardArray, const Move& move, PositionsMap& whit
         
         if (abs(targetY-startY) == 2) {
             g.prevX = targetX;
+            // get the middle y
             g.prevY = (startY + targetY) / 2;
         } else {
             // clear en passant
             g.prevX = -1;
             g.prevY = -1;
         }
+    } else {
+        g.prevX = -1;
+        g.prevY = -1;
     }
 
     // Update castling parameters
@@ -173,39 +178,70 @@ void movePieceServer(BoardType& boardArray, const Move& move, PositionsMap& whit
     boardArray[targetY][targetX] = pieceStr;
     boardArray[startY][startX] = "";
 
-    // g.prevX = targetX;
-    // g.prevY = targetY;
+    g.turn = (g.turn == 'w') ? 'b' : 'w';
+}
+
+void printBoard(string board[8][8], GameData& g) {
+    std::cout << "Current Board:" << std::endl;
+    for (int y = 0; y < 8; ++y) {
+        std::cout << 8 - y << " ";
+        for (int x = 0; x < 8; ++x) {
+            string piece = board[y][x];
+            if (piece != "") {
+                std::cout << piece << " ";
+            } else {
+                std::cout << ".. ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "   a  b  c  d  e  f  g  h" << std::endl;
+
+    std::cout << "white king moved: " << g.hasWhiteKingMoved << std::endl;
+    std::cout << "white right rook moved: " << g.hasWhiteRightRookMoved << std::endl;
+    std::cout << "white left rook moved: " << g.hasWhiteLeftRookMoved << std::endl;
+
+    std::cout << "black king moved: " << g.hasBlackKingMoved << std::endl;
+    std::cout << "black right rook moved: " << g.hasBlackRightRookMoved << std::endl;
+    std::cout << "black left rook moved: " << g.hasBlackLeftRookMoved << std::endl;
+
+    std::cout << "prev x: " << g.prevX << std::endl;
+    std::cout << "prev y: " << g.prevY << std::endl; 
+    std::cout << "turn: " << g.turn << std::endl;
 }
 
 // int base_depth = 3;
-int help(BoardType& board, PositionsMap& whitePositions, PositionsMap& blackPositions,
-         char turn, char oppTurn, int depth, GameData& g, int initial_depth) {
-    if (depth == 0) {
-        return 1;
-    }
+int help(string board[8][8], PositionsMap& whitePositions, PositionsMap& blackPositions, int depth, GameData& g, int initial_depth) {
 
     std::vector<Move> possibleMoves;
-    if (turn == 'w') {
+    if (g.turn == 'w') {
         possibleMoves = getValidMovesWhite(board, whitePositions, g);
     } else {
         possibleMoves = getValidMovesBlack(board, blackPositions, g);
     }
 
-    if (possibleMoves.empty()) {
+    if (depth == 0) {
+        return 1;
+    }
+    if (possibleMoves.size() == 0) {
         return 0;
     }
+    
 
     int nodes = 0;
 
     for (const auto& move : possibleMoves) {
+        // if (depth == initial_depth && (move.startX != 1 || move.startY != 1 || move.targetX != 1 || move.targetY != 3)) continue;
+        // printBoard(board);
         std::string eaten = board[move.targetY][move.targetX];
         GameData g_copy = g;
+        // BoardType board_copy = board;
 
         char pieceType = board[move.startY][move.startX][1];
 
         movePieceServer(board, move, whitePositions, blackPositions, g);
 
-        int childNodes = help(board, whitePositions, blackPositions, oppTurn, turn, depth - 1, g, initial_depth);
+        int childNodes = help(board, whitePositions, blackPositions, depth - 1, g, initial_depth);
 
         nodes += childNodes;
 
@@ -220,12 +256,14 @@ int help(BoardType& board, PositionsMap& whitePositions, PositionsMap& blackPosi
                 promotionStr += move.promotion;
             }
 
+            // printBoard(board, g);
             std::cout << fromFile << fromRank << toFile << toRank << promotionStr
                       << ": " << childNodes << std::endl;
         }
 
         // Undo move
         g = g_copy;
+        // board = board_copy;
         undoMoveServer(board, move.startX, move.startY, move.targetX, move.targetY,
                        whitePositions, blackPositions, g, eaten, pieceType);
     }
@@ -411,18 +449,6 @@ extern "C" {
 
         int initial_depth = depth;
 
-        BoardType board_vec(8, std::vector<std::string>(8));
-        for (int y = 0; y < 8; ++y) {
-            for (int x = 0; x < 8; ++x) {
-                string str = board[y][x];
-                if (str != "") {
-                    board_vec[y][x] = str;
-                } else {
-                    board_vec[y][x] = ""; // Empty string represents an empty square
-                }
-            }
-        }
-
         PositionsMap whitePositions;
         PositionsMap blackPositions;
 
@@ -442,35 +468,17 @@ extern "C" {
             }
         }
 
-        int count = help(board_vec, whitePositions, blackPositions, gg.turn, gg.turn == 'w' ? 'b' : 'w', depth, gg, initial_depth);
+        int count = help(board, whitePositions, blackPositions, depth, gg, initial_depth);
 
         std::cout << "Perft result: " << count << " nodes at depth " << depth << std::endl;
     }
 
 } // extern "C"
 
-void printBoard(string board[8][8]) {
-    std::cout << "Current Board:" << std::endl;
-    for (int y = 0; y < 8; ++y) {
-        std::cout << 8 - y << " ";
-        for (int x = 0; x < 8; ++x) {
-            string piece = board[y][x];
-            if (piece != "") {
-                std::cout << piece << " ";
-            } else {
-                std::cout << ".. ";
-            }
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "   a  b  c  d  e  f  g  h" << std::endl;
-}
-
 int main () {
-     // Initialize the board buffer
+    
     string board[8][8];
 
-    // Step 1: Initialize all positions to nullptr
     for (int y = 0; y < 8; ++y) {
         for (int x = 0; x < 8; ++x) {
             board[y][x] = "";
@@ -480,11 +488,6 @@ int main () {
     GameData gg;
 
     setBoardFromFen(board, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", gg);
-    // setBoardFromFen(board, "rnbq1k1r/pp1Pbppp/2p5/8/1PB5/8/P1P1NnPP/RNBQK2R b KQ - 1 8", gg);
-    // setBoardFromFen(board, "rnbq1k1r/1p1Pbppp/2p5/p7/1PB5/8/P1P1NnPP/RNBQK2R w KQ a6 1 8", gg);
-    // setBoardFromFen(board, "rnbq1k1r/1p1Pbppp/2p5/pP6/2B5/8/P1P1NnPP/RNBQK2R b KQ - 1 8", gg);
-    // setBoardFromFen(board, "rnbq1k1r/1p1Pbppp/8/pp6/2B5/8/P1P1NnPP/RNBQK2R w KQ - 1 8", gg);
-
-    printBoard(board);
+    printBoard(board, gg);
     perft(board, 4, gg);
 }

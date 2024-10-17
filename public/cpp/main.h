@@ -26,7 +26,7 @@ struct GameData {
     char turn = 'w';
 };
 
-typedef std::vector<std::vector<std::string>> BoardType;
+// typedef std::vector<std::vector<std::string>> BoardType;
 typedef std::map<std::pair<int, int>, char> PositionsMap;
 
 struct Move {

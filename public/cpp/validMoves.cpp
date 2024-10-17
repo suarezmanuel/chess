@@ -18,7 +18,7 @@ void deleteFromMap(PositionsMap& positions, const std::pair<int, int>& key) {
     positions.erase(key);
 }
 
-bool isInCheck(BoardType& board, char color, const std::pair<int, int>& kingPos) {
+bool isInCheck(std::string board[8][8], char color, const std::pair<int, int>& kingPos) {
     int xPos = kingPos.first;
     int yPos = kingPos.second;
     char oppColor = (color == 'w') ? 'b' : 'w';
@@ -99,7 +99,7 @@ bool isInCheck(BoardType& board, char color, const std::pair<int, int>& kingPos)
     return false;
 }
 
-std::vector<Move> validMovesFromArray(BoardType& board, int startX, int startY, const std::vector<Move>& movesArray, PositionsMap& positions, char color) {
+std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int startY, const std::vector<Move>& movesArray, PositionsMap& positions, char color) {
     char piece = board[startY][startX][1];
     std::pair<int, int> kingPos;
     for (const auto& [key, value] : positions) {
@@ -135,7 +135,7 @@ std::vector<Move> validMovesFromArray(BoardType& board, int startX, int startY, 
     return validMoves;
 }
 
-std::vector<Move> pawnMoves(BoardType& board, char color, int xPos, int yPos, GameData& g) {
+std::vector<Move> pawnMoves(std::string board[8][8], char color, int xPos, int yPos, GameData& g) {
     std::vector<Move> moves;
     char oppColor = (color == 'w') ? 'b' : 'w';
     int direction = (color == 'w') ? -1 : 1;
@@ -163,12 +163,14 @@ std::vector<Move> pawnMoves(BoardType& board, char color, int xPos, int yPos, Ga
     }
 
     // En passant
-    if (g.prevX != -1 && g.prevY != -1 && checkPiece(board[g.prevY][g.prevX], 'p')) {
-        if (abs(g.prevX - xPos) == 1 && g.prevY == yPos) {
-            if (yPos == (color == 'w' ? 3 : 4)) {
-                int targetY = yPos + direction;
-                moves.push_back({xPos, yPos, g.prevX, targetY});
-            }
+    // we only update en passant for opponent so no color check needed
+    if (g.prevX != -1 && g.prevY != -1) {
+        if (abs(g.prevX - xPos) == 1 && abs(g.prevY - yPos) == 1) {
+            // if (yPos == (color == 'w' ? 3 : 4)) {
+            //     int targetY = yPos + direction;
+            //     moves.push_back({xPos, yPos, g.prevX, targetY});
+            // }
+            moves.push_back({xPos, yPos, g.prevX, g.prevY});
         }
     }
 
@@ -190,7 +192,7 @@ std::vector<Move> pawnMoves(BoardType& board, char color, int xPos, int yPos, Ga
     return promotionMoves;
 }
 
-std::vector<Move> rookMoves(BoardType& board, char color, int xPos, int yPos) {
+std::vector<Move> rookMoves(std::string board[8][8], char color, int xPos, int yPos) {
     std::vector<Move> moves;
     char oppColor = (color == 'w') ? 'b' : 'w';
 
@@ -209,7 +211,7 @@ std::vector<Move> rookMoves(BoardType& board, char color, int xPos, int yPos) {
     return moves;
 }
 
-std::vector<Move> knightMoves(BoardType& board, char color, int xPos, int yPos) {
+std::vector<Move> knightMoves(std::string board[8][8], char color, int xPos, int yPos) {
     std::vector<Move> moves;
     char oppColor = (color == 'w') ? 'b' : 'w';
 
@@ -225,7 +227,7 @@ std::vector<Move> knightMoves(BoardType& board, char color, int xPos, int yPos) 
     return moves;
 }
 
-std::vector<Move> bishopMoves(BoardType& board, char color, int xPos, int yPos) {
+std::vector<Move> bishopMoves(std::string board[8][8], char color, int xPos, int yPos) {
     std::vector<Move> moves;
     char oppColor = (color == 'w') ? 'b' : 'w';
 
@@ -244,14 +246,14 @@ std::vector<Move> bishopMoves(BoardType& board, char color, int xPos, int yPos) 
     return moves;
 }
 
-std::vector<Move> queenMoves(BoardType& board, char color, int xPos, int yPos) {
+std::vector<Move> queenMoves(std::string board[8][8], char color, int xPos, int yPos) {
     std::vector<Move> moves = rookMoves(board, color, xPos, yPos);
     std::vector<Move> bishopMovesList = bishopMoves(board, color, xPos, yPos);
     moves.insert(moves.end(), bishopMovesList.begin(), bishopMovesList.end());
     return moves;
 }
 
-std::vector<Move> castleMoves(BoardType& board, char color, GameData& g) {
+std::vector<Move> castleMoves(std::string board[8][8], char color, GameData& g) {
     std::vector<Move> moves;
     int yPos = (color == 'w') ? 7 : 0;
     bool hasKingMoved = (color == 'w') ? g.hasWhiteKingMoved : g.hasBlackKingMoved;
@@ -287,7 +289,7 @@ std::vector<Move> castleMoves(BoardType& board, char color, GameData& g) {
     return moves;
 }
 
-std::vector<Move> kingMoves(BoardType& board, char color, int xPos, int yPos, GameData& g) {
+std::vector<Move> kingMoves(std::string board[8][8], char color, int xPos, int yPos, GameData& g) {
     std::vector<Move> moves;
     char oppColor = (color == 'w') ? 'b' : 'w';
 
@@ -309,7 +311,7 @@ std::vector<Move> kingMoves(BoardType& board, char color, int xPos, int yPos, Ga
     return moves;
 }
 
-std::vector<Move> getValidMoves(BoardType& board, const std::string& piece, int xPos, int yPos, PositionsMap& positions, GameData& g) {
+std::vector<Move> getValidMoves(std::string board[8][8], const std::string& piece, int xPos, int yPos, PositionsMap& positions, GameData& g) {
     char pieceType = piece[1];
     char color = piece[0];
     std::vector<Move> moves;
@@ -341,7 +343,7 @@ std::vector<Move> getValidMoves(BoardType& board, const std::string& piece, int 
     return moves;
 }
 
-std::vector<Move> getValidMovesWhite(BoardType& board, PositionsMap& whitePositions, GameData& g) {
+std::vector<Move> getValidMovesWhite(std::string board[8][8], PositionsMap& whitePositions, GameData& g) {
     std::vector<Move> moves;
     for (const auto& [key, value] : whitePositions) {
         int x = key.first;
@@ -353,7 +355,7 @@ std::vector<Move> getValidMovesWhite(BoardType& board, PositionsMap& whitePositi
     return moves;
 }
 
-std::vector<Move> getValidMovesBlack(BoardType& board, PositionsMap& blackPositions, GameData& g) {
+std::vector<Move> getValidMovesBlack(std::string board[8][8], PositionsMap& blackPositions, GameData& g) {
     std::vector<Move> moves;
     for (const auto& [key, value] : blackPositions) {
         int x = key.first;
