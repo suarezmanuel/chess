@@ -99,8 +99,10 @@ bool isInCheck(std::string board[8][8], char color, const std::pair<int, int>& k
     return false;
 }
 
-std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int startY, const std::vector<Move>& movesArray, PositionsMap& positions, char color) {
-    char piece = board[startY][startX][1];
+std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int startY, const std::vector<Move>& movesArray, PositionsMap& positions, char color, GameData& g) {
+    std::string pieceStr = board[startY][startX];
+    // char color = pieceStr[0];
+    char piece = pieceStr[1];
     std::pair<int, int> kingPos;
     for (const auto& [key, value] : positions) {
         if (value == 'k') {
@@ -112,11 +114,21 @@ std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int s
     std::vector<Move> validMoves;
 
     for (const auto& move : movesArray) {
+
+        // handle en passant
+        int flag = move.targetX == g.prevX && move.targetY == g.prevY && piece == 'p';
+        int diffX = move.targetX - startX;
+
+        int eatenY = move.targetY*(1-flag) + startY*flag;
+        int eatenX = move.targetX*(1-flag) + (startX + diffX)*flag;
+
         std::string temp = board[move.targetY][move.targetX];
+        std::string temp2 = board[eatenY][eatenX];
+        board[eatenY][eatenX] = "";
 
         // Make the move
         board[startY][startX] = "";
-        board[move.targetY][move.targetX] = std::string(1, color) + piece;
+        board[move.targetY][move.targetX] = pieceStr;
 
         std::pair<int, int> newKingPos = kingPos;
         if (piece == 'k') {
@@ -130,6 +142,7 @@ std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int s
         // Undo the move
         board[startY][startX] = std::string(1, color) + piece;
         board[move.targetY][move.targetX] = temp;
+        board[eatenY][eatenX] = temp2;
     }
 
     return validMoves;
@@ -338,7 +351,7 @@ std::vector<Move> getValidMoves(std::string board[8][8], const std::string& piec
     }
 
     // Filter moves that don't put the king in check
-    moves = validMovesFromArray(board, xPos, yPos, moves, positions, color);
+    moves = validMovesFromArray(board, xPos, yPos, moves, positions, color, g);
 
     return moves;
 }
