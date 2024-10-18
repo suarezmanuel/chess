@@ -1,4 +1,4 @@
-#include "./main.h"
+#include "chess.h"
 
 inline bool isBad(const std::string& piece) {
     return piece.empty();
