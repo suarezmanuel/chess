@@ -1,16 +1,22 @@
 # Define variables
-SRC = cpp/main.cpp    # List of source files
-DST = bin/
-EXECUTABLE = $(DST)main                   # Name of the executable
+SRC = cpp/tests/test.cpp    # List of source files
+EXECUTABLE = cpp/tests/test                   # Name of the executable
 CXX = g++                           # Compiler
-CXXFLAGS = -O3 -std=c++17           # Compiler flags
+CXXFLAGS = -Wall -g
+LDFLAGS = -lgtest -lgtest_main -pthread
+
+# Declare phony targets
+.PHONY: all run clean rebuild test FORCE
 
 # Default target: build the executable
 all: $(EXECUTABLE)
 
-# Build the executable
-$(EXECUTABLE): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $(EXECUTABLE) $(SRC)
+# Define FORCE as a phony target that is always out-of-date
+FORCE:
+
+# Build the executable (always rebuild because it depends on FORCE)
+$(EXECUTABLE): FORCE
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(EXECUTABLE) $(LDFLAGS) 
 
 # Run the executable
 .PHONY: run
@@ -29,4 +35,4 @@ rebuild: clean all
 # Test placeholder (if you want to integrate unit tests later)
 .PHONY: test
 test: all
-	./$(EXECUTABLE) --test  # Replace with actual test command
+	./$(EXECUTABLE)  # Replace with actual test command

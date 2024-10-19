@@ -1,11 +1,10 @@
-# Define variables
-SRC = cpp/tests/test.cpp    # List of source files
-EXECUTABLE = cpp/tests/test                   # Name of the executable
-CXX = g++                           # Compiler
-CXXFLAGS = -Wall -g
-LDFLAGS = -lgtest -lgtest_main -pthread
+SRC = test.cpp                     # Source file
+EXECUTABLE = ./bin/test        # Full path to the executable
+CXX = g++                          # Compiler
+CXXFLAGS = -Wall -g                # Compiler flags
+LDFLAGS = -lgtest -lgtest_main -pthread  # Linker flags for Google Test
 
-# Declare phony targets
+# Declare all phony targets in a single line to prevent overrides
 .PHONY: all run clean rebuild test FORCE
 
 # Default target: build the executable
@@ -14,25 +13,27 @@ all: $(EXECUTABLE)
 # Define FORCE as a phony target that is always out-of-date
 FORCE:
 
-# Build the executable (always rebuild because it depends on FORCE)
-$(EXECUTABLE): FORCE
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(EXECUTABLE) $(LDFLAGS) 
+# Rule to ensure BIN_DIR exists before building the executable
+$(EXECUTABLE): FORCE | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(EXECUTABLE) $(LDFLAGS)
+
+# Create BIN_DIR if it doesn't exist
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
 # Run the executable
-.PHONY: run
-run:
+run: $(EXECUTABLE)
 	./$(EXECUTABLE)
+	g++ plot_records.cpp -o ./bin/plot_records
+	./plot_records
 
 # Clean the executable
-.PHONY: clean
 clean:
 	rm -f $(EXECUTABLE)
 
 # Rebuild the project
-.PHONY: rebuild
 rebuild: clean all
 
-# Test placeholder (if you want to integrate unit tests later)
-.PHONY: test
+# Test target (runs the executable)
 test: all
-	./$(EXECUTABLE)  # Replace with actual test command
+	./$(EXECUTABLE)  # Replace with actual test command if different

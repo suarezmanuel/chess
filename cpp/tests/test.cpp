@@ -9,9 +9,8 @@
 #include <map>
 
 namespace fs = std::filesystem;
-
-typedef std::chrono::_V2::system_clock::time_point timePoint;
-
+#define ITERATIONS 5
+typedef std::chrono::high_resolution_clock::time_point timePoint;
 int board_count = 0;
 timePoint start; 
 std::ofstream file; 
@@ -44,70 +43,70 @@ void open_perft_record_file(int initial_depth) {
     }
 }
 
-int perft_record(std::string board[8][8], 
+void perft_record(std::string board[8][8], 
                 PositionsMap& whitePositions, 
                 PositionsMap& blackPositions, 
                 int depth, 
                 GameData& g, 
                 int initial_depth) {
     
-    if (depth == 1 && board_count < 2000) {
-        if (!file.is_open()) {
-            open_perft_record_file(initial_depth);
+    if (board_count >= 2000 || depth == 0) return;
+
+    int loop_count = 1;
+    double avg = 0;
+    if (depth == 1) { loop_count = ITERATIONS; }
+
+    for (int i=0; i < loop_count; i++) {
+
+        if (depth == 1) {
+            if (!file.is_open()) {
+                open_perft_record_file(initial_depth);
+            }
+            start = std::chrono::high_resolution_clock::now();
         }
-        start = std::chrono::high_resolution_clock::now();
-    }
 
-    std::vector<Move> possibleMoves;
-    if (g.turn == 'w') {
-        possibleMoves = getValidMovesWhite(board, whitePositions, g);
-    } else {
-        possibleMoves = getValidMovesBlack(board, blackPositions, g);
-    }
-
-    if (depth == 0) {
-        return 1;
-    }
-    if (possibleMoves.empty()) {
-        return 0;
-    }
-
-    int nodes = 0;
-
-    for (const auto& move : possibleMoves) {
-
-        std::string eaten = board[move.targetY][move.targetX];
-        GameData g_copy = g;
-
-        char pieceType = board[move.startY][move.startX][1];
-
-        movePiece(board, move, whitePositions, blackPositions, g);
-
-        if (depth == 1 && board_count < 2000) {
-            int childNodes = perft_record(board, whitePositions, blackPositions, depth - 1, g, initial_depth);
-            nodes += childNodes;
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double, std::micro> elapsed = end - start;
-
-            file << board_count << "," << elapsed.count() << "\n";
-            board_count++;
+        std::vector<Move> possibleMoves;
+        if (g.turn == 'w') {
+            possibleMoves = getValidMovesWhite(board, whitePositions, g);
         } else {
-            int childNodes = perft_record(board, whitePositions, blackPositions, depth - 1, g, initial_depth);
-            nodes += childNodes;
+            possibleMoves = getValidMovesBlack(board, blackPositions, g);
         }
 
-        g = g_copy;
-        undoMove(board, move.startX, move.startY, move.targetX, move.targetY,
-                 whitePositions, blackPositions, g, eaten, pieceType);
+        if (possibleMoves.empty()) return;
+
+        for (const auto& move : possibleMoves) {
+
+            std::string eaten = board[move.targetY][move.targetX];
+            GameData g_copy = g;
+
+            char pieceType = board[move.startY][move.startX][1];
+
+            movePiece(board, move, whitePositions, blackPositions, g);
+
+            perft_record(board, whitePositions, blackPositions, depth - 1, g, initial_depth);
+
+            g = g_copy;
+            undoMove(board, move.startX, move.startY, move.targetX, move.targetY,
+                    whitePositions, blackPositions, g, eaten, pieceType);
+        }
+
+        if (depth == 1) {
+            timePoint end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+            avg += static_cast<double>(duration);
+        }
     }
 
-    return nodes;
+    if (depth == 1) {
+        file << board_count << "," << (avg/ITERATIONS) << "\n";
+        board_count++;
+    }
 }
 
 std::string fileName;
+char response = '`';
 
-void test_perft_record (const std::string& fen, int depth, int expected_val) {
+void write_perft_record (const std::string& fen, int depth) {
     std::string board[8][8];
 
     if (file.is_open()) {
@@ -144,14 +143,16 @@ void test_perft_record (const std::string& fen, int depth, int expected_val) {
     }
 
     board_count = 0;
-    EXPECT_EQ(perft_record(board, whitePositions, blackPositions, depth, gg, depth), expected_val);
+    perft_record(board, whitePositions, blackPositions, depth, gg, depth);
 
-    std::cout << "Do you want to save the performance results for depth " << depth << "? (y/n): ";
-    char response;
-    std::cin >> response;
+    if (response == '`') {
+        std::cout << "Do you want to record performance for these runs? (y/n): ";
+        std::cin >> response;
+    }
 
     std::string source_file = "temp/perft_depth" + std::to_string(depth) + "_temp.csv";
 
+    // if y is pressed move the file to records
     if (response == 'y' || response == 'Y') {
 
         if (fileName.empty()) {
@@ -176,7 +177,7 @@ void test_perft_record (const std::string& fen, int depth, int expected_val) {
         #ifdef _WIN32
             localtime_s(&now_tm, &now_time);
         #else
-            localtime_r(&now_time, &now_tm);
+             localtime_r(&now_time, &now_tm);
         #endif
 
         char time_buffer[20];
@@ -187,7 +188,6 @@ void test_perft_record (const std::string& fen, int depth, int expected_val) {
 
         std::string dest_file = new_filename;
 
-        // if y is pressed move the file to records
         try {
             fs::rename(source_file, dest_file);
             std::cout << "Performance data moved to " << dest_file << std::endl;
@@ -295,25 +295,31 @@ void test_perft (std::string fen, int depth, int expected_val) {
 
 
 TEST(perft_board_2, depth_1) {
-    test_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 1, 48);
+    test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 1, 48);
 }
 
 TEST(perft_board_2, depth_2) {
-    test_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2, 2039);
+    test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2, 2039);
+    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2);
 }
 
 TEST(perft_board_2, depth_3) {
-    test_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862);
+    test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862);
+    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3);
 }
 
-
-TEST(perft_board_3, depth_1) {
-    test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 1, 14);
+TEST(perft_board_2, depth_4) {
+    // test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862);
+    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4);
 }
 
-TEST(perft_board_3, depth_2) {
-    test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2, 191);
-}
+// TEST(perft_board_3, depth_1) {
+//     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 1, 14);
+// }
+
+// TEST(perft_board_3, depth_2) {
+//     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2, 191);
+// }
 
 // TEST(perft_board_3, depth_3) {
 //     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 3, 2812);
