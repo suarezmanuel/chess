@@ -21,7 +21,7 @@ click the following image
 the bot for now is able to see 0 moves ahead,
 
 it makes use of the following optimizations:
-1. none
+1. nonee
 2. none
 3. none
 4. none
