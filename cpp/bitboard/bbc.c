@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #define U64 unsigned long long
 
@@ -10,10 +11,16 @@ enum {
     a4, b4, c4, d4, e4, f4, g4, h4,
     a3, b3, c3, d3, e3, f3, g3, h3,
     a2, b2, c2, d2, e2, f2, g2, h2,
-    a1, b1, c1, d1, e1, f1, g1, h1,
+    a1, b1, c1, d1, e1, f1, g1, h1, no_sq,
 };
 
-enum {white, black};
+enum { white, black, both };
+enum { rook, bishop };
+
+// represent castling rights using 4 bits
+enum { wk = 1, wq = 2, bk = 4, bq = 8 };
+
+enum { P, N, B, R, Q, K, p, n, b, r, q, k };
 
 const char* square_to_coordinates[] = {
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
@@ -26,11 +33,36 @@ const char* square_to_coordinates[] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
 };
 
+char ascii_pieces[12] = "PNBRQKpnbrqk";
+
+char* unicode_pieces[12] = {"♙", "♘", "♗", "♖", "♕", "♔", "♟︎", "♞", "♝", "♜", "♛", "♚"};
+
+int char_pieces[] = {
+    ['P'] = P,
+    ['N'] = N,
+    ['B'] = B,
+    ['R'] = R,
+    ['Q'] = Q,
+    ['K'] = K,
+    ['p'] = p,
+    ['n'] = n,
+    ['b'] = b,
+    ['r'] = r,
+    ['q'] = q,
+    ['k'] = k
+};
+
+#define empty_board "8/8/8/8/8/8/8/8 w - - "
+#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
+#define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
+#define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
+#define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
+
 #define get_bit(bitboard, square) (bitboard & (1ULL << square))
 #define set_bit(bitboard, square) (bitboard |= (1ULL << square))
 #define pop_bit(bitboard, square) (bitboard ^= (1ULL << square))
 
-static inline int bit_count (U64 bitboard) {
+static inline int count_bits (U64 bitboard) {
     int counter = 0;
 
     while (bitboard) {
@@ -43,8 +75,9 @@ static inline int bit_count (U64 bitboard) {
 static inline int get_lsb1_index (U64 bitboard) {
     int index = 0;
     if (bitboard == 0ULL) { return -1; }
-    return bit_count((bitboard & -bitboard)-1);
+    return count_bits((bitboard & -bitboard)-1);
 }
+
 
 /*
     not a file
@@ -109,7 +142,22 @@ const U64 not_h_file  = 9187201950435737471ULL;
 const U64 not_ab_file = 18229723555195321596ULL;
 const U64 not_gh_file = 4557430888798830399ULL;
 
-const int bishop_revelant_bits[64] = {
+// define bitboards
+U64 bitboards[12];
+
+// occupancy bitboards
+U64 occupancies[3];
+
+// side to move
+int side = white;
+
+int enpassant = no_sq;
+
+int castle = -1;
+
+
+
+const int bishop_relevant_bits[64] = {
     6, 5, 5, 5, 5, 5, 5, 6, 
     5, 5, 5, 5, 5, 5, 5, 5, 
     5, 5, 7, 7, 7, 7, 5, 5, 
@@ -120,7 +168,7 @@ const int bishop_revelant_bits[64] = {
     6, 5, 5, 5, 5, 5, 5, 6, 
 };
 
-const int rook_revelant_bits[64] = {
+const int rook_relevant_bits[64] = {
     12, 11, 11, 11, 11, 11, 11, 12, 
     11, 10, 10, 10, 10, 10, 10, 11, 
     11, 10, 10, 10, 10, 10, 10, 11, 
@@ -129,13 +177,149 @@ const int rook_revelant_bits[64] = {
     11, 10, 10, 10, 10, 10, 10, 11, 
     11, 10, 10, 10, 10, 10, 10, 11, 
     12, 11, 11, 11, 11, 11, 11, 12, 
+};
+
+U64 rook_magic_numbers[64] = {
+    0x8a80104000800020ULL,
+    0x140002000100040ULL,
+    0x2801880a0017001ULL,
+    0x100081001000420ULL,
+    0x200020010080420ULL,
+    0x3001c0002010008ULL,
+    0x8480008002000100ULL,
+    0x2080088004402900ULL,
+    0x800098204000ULL,
+    0x2024401000200040ULL,
+    0x100802000801000ULL,
+    0x120800800801000ULL,
+    0x208808088000400ULL,
+    0x2802200800400ULL,
+    0x2200800100020080ULL,
+    0x801000060821100ULL,
+    0x80044006422000ULL,
+    0x100808020004000ULL,
+    0x12108a0010204200ULL,
+    0x140848010000802ULL,
+    0x481828014002800ULL,
+    0x8094004002004100ULL,
+    0x4010040010010802ULL,
+    0x20008806104ULL,
+    0x100400080208000ULL,
+    0x2040002120081000ULL,
+    0x21200680100081ULL,
+    0x20100080080080ULL,
+    0x2000a00200410ULL,
+    0x20080800400ULL,
+    0x80088400100102ULL,
+    0x80004600042881ULL,
+    0x4040008040800020ULL,
+    0x440003000200801ULL,
+    0x4200011004500ULL,
+    0x188020010100100ULL,
+    0x14800401802800ULL,
+    0x2080040080800200ULL,
+    0x124080204001001ULL,
+    0x200046502000484ULL,
+    0x480400080088020ULL,
+    0x1000422010034000ULL,
+    0x30200100110040ULL,
+    0x100021010009ULL,
+    0x2002080100110004ULL,
+    0x202008004008002ULL,
+    0x20020004010100ULL,
+    0x2048440040820001ULL,
+    0x101002200408200ULL,
+    0x40802000401080ULL,
+    0x4008142004410100ULL,
+    0x2060820c0120200ULL,
+    0x1001004080100ULL,
+    0x20c020080040080ULL,
+    0x2935610830022400ULL,
+    0x44440041009200ULL,
+    0x280001040802101ULL,
+    0x2100190040002085ULL,
+    0x80c0084100102001ULL,
+    0x4024081001000421ULL,
+    0x20030a0244872ULL,
+    0x12001008414402ULL,
+    0x2006104900a0804ULL,
+    0x1004081002402ULL
+};
+
+U64 bishop_magic_numbers[64] = {
+    0x40040844404084ULL,
+    0x2004208a004208ULL,
+    0x10190041080202ULL,
+    0x108060845042010ULL,
+    0x581104180800210ULL,
+    0x2112080446200010ULL,
+    0x1080820820060210ULL,
+    0x3c0808410220200ULL,
+    0x4050404440404ULL,
+    0x21001420088ULL,
+    0x24d0080801082102ULL,
+    0x1020a0a020400ULL,
+    0x40308200402ULL,
+    0x4011002100800ULL,
+    0x401484104104005ULL,
+    0x801010402020200ULL,
+    0x400210c3880100ULL,
+    0x404022024108200ULL,
+    0x810018200204102ULL,
+    0x4002801a02003ULL,
+    0x85040820080400ULL,
+    0x810102c808880400ULL,
+    0xe900410884800ULL,
+    0x8002020480840102ULL,
+    0x220200865090201ULL,
+    0x2010100a02021202ULL,
+    0x152048408022401ULL,
+    0x20080002081110ULL,
+    0x4001001021004000ULL,
+    0x800040400a011002ULL,
+    0xe4004081011002ULL,
+    0x1c004001012080ULL,
+    0x8004200962a00220ULL,
+    0x8422100208500202ULL,
+    0x2000402200300c08ULL,
+    0x8646020080080080ULL,
+    0x80020a0200100808ULL,
+    0x2010004880111000ULL,
+    0x623000a080011400ULL,
+    0x42008c0340209202ULL,
+    0x209188240001000ULL,
+    0x400408a884001800ULL,
+    0x110400a6080400ULL,
+    0x1840060a44020800ULL,
+    0x90080104000041ULL,
+    0x201011000808101ULL,
+    0x1a2208080504f080ULL,
+    0x8012020600211212ULL,
+    0x500861011240000ULL,
+    0x180806108200800ULL,
+    0x4000020e01040044ULL,
+    0x300000261044000aULL,
+    0x802241102020002ULL,
+    0x20906061210001ULL,
+    0x5a84841004010310ULL,
+    0x4010801011c04ULL,
+    0xa010109502200ULL,
+    0x4a02012000ULL,
+    0x500201010098b028ULL,
+    0x8040002811040900ULL,
+    0x28000010020204ULL,
+    0x6000020202d0240ULL,
+    0x8918844842082200ULL,
+    0x4010011029020020ULL
 };
 
 U64 pawn_attacks[2][64];
 U64 knight_attacks[64];
 U64 king_attacks[64];
-U64 bishop_attacks[64];
-U64 rook_attacks[64];
+U64 bishop_masks[64];
+U64 rook_masks[64];
+U64 bishop_attacks[64][512];
+U64 rook_attacks[64][4096];
 U64 queen_attacks[64];
 
 
@@ -145,8 +329,7 @@ U64 mask_pawn_attacks(int side, int square) {
     U64 bitboard = 0ULL;
     set_bit(bitboard, square);
 
-    // if white
-    if (!side) {
+    if (side) {
         attacks |= (not_h_file & (bitboard << 7));
         attacks |= (not_a_file & (bitboard << 9));
     } else {
@@ -228,25 +411,25 @@ U64 bishop_attacks_on_the_fly(int square, U64 block) {
     int r = square/8;
     int c = square%8;
     U64 t;
-    for (int i=r+1, j=c+1; i < 7 && j < 7; i++, j++) 
+    for (int i=r+1, j=c+1; i < 8 && j < 8; i++, j++) 
     { 
         t = 1ULL << (i*8 + j);
         attacks |= t;
         if (block & t) break;
     }
-    for (int i=r+1, j=c-1; i < 7 && j > 0; i++, j--) 
+    for (int i=r+1, j=c-1; i < 8 && j >= 0; i++, j--) 
     { 
         t = 1ULL << (i*8 + j);
         attacks |= t;
         if (block & t) break;
     }
-    for (int i=r-1, j=c+1; i > 0 && j < 7; i--, j++) 
+    for (int i=r-1, j=c+1; i >= 0 && j < 8; i--, j++) 
     { 
         t = 1ULL << (i*8 + j);
         attacks |= t;
         if (block & t) break;
     }
-    for (int i=r-1, j=c-1; i > 0 && j > 0; i--, j--) 
+    for (int i=r-1, j=c-1; i >= 0 && j >= 0; i--, j--) 
     { 
         t = 1ULL << (i*8 + j);
         attacks |= t;
@@ -261,28 +444,28 @@ U64 rook_attacks_on_the_fly(int square, U64 block) {
     int c = square%8;
     U64 t;
     // go right
-    for (int i=r+1; i < 7; i++) 
+    for (int i=r+1; i < 8; i++) 
     { 
         t = 1ULL << (i*8 + c);
         attacks |= t;
         if (block & t) break;
     }
     // go left
-    for (int i=r-1; i > 0; i--) 
+    for (int i=r-1; i >= 0; i--) 
     { 
         t = 1ULL << (i*8 + c);
         attacks |= t;
         if (block & t) break;
     }
     // go down
-    for (int i=c+1; i < 7; i++) 
+    for (int i=c+1; i < 8; i++) 
     { 
         t = 1ULL << (r*8 + i);
         attacks |= t;
         if (block & t) break;
     }
     // go up
-    for (int i=c-1; i > 0; i--) 
+    for (int i=c-1; i >= 0; i--) 
     { 
         t = 1ULL << (r*8 + i);
         attacks |= t;
@@ -305,15 +488,115 @@ void print_bitboard(U64 board) {
     printf("\n    Bitboard: %llud\n\n", board);
 }
 
-void init_leapers_attacks() {
-    for (int i=0; i < 64; i++) {
-        pawn_attacks[white][i] = mask_pawn_attacks(white, i);
-        pawn_attacks[black][i] = mask_pawn_attacks(black, i);
-        knight_attacks[i] = mask_knight_attacks(i);
-        king_attacks[i] = mask_king_attacks(i);
-        bishop_attacks[i] = mask_bishop_attacks(i);
-        rook_attacks[i] = mask_rook_attacks(i);
+// arguments are global
+void print_board() {
+    for (int rank = 0; rank < 8; rank++) {
+        for (int file = 0; file < 8; file++) {
+
+            int square = rank*8 + file;
+
+            if (!file)
+                printf("  %d ", 8 - rank);
+
+            int piece = -1;
+
+            // goes over pieces
+            for (int bb_piece = P; bb_piece <= k; bb_piece++) {
+                if (get_bit(bitboards[bb_piece], square))
+                    piece = bb_piece;
+            }
+
+            #ifdef WIN64
+                printf(" %c", (piece == -1) ? '.' : ascii_pieces[piece]);
+            #else
+                printf(" %s", (piece == -1) ? "." : unicode_pieces[piece]);
+            #endif
+        }
+        printf("\n");
     }
+    printf("\n     a b c d e f g h \n\n");
+    printf("     Side:    %s\n", !side ? "white" : "black");
+    printf("     Enpassant: %s\n", enpassant != no_sq ? square_to_coordinates[enpassant] : "no");
+    printf("     Castling: %c%c%c%c\n\n", castle & wk ? 'K' : '-', castle & wq ? 'Q' : '-', castle & bk ? 'k' : '-', castle & bq ? 'q' : '-');
+    
+}
+
+void parse_fen(char* fen) {
+    memset(bitboards, 0ULL, sizeof(bitboards));
+    memset(occupancies, 0ULL, sizeof(occupancies));
+
+    side = 0;
+    enpassant = no_sq;
+    castle = 0;
+
+    for (int rank = 0; rank < 8; rank++) {
+        for (int file = 0; file < 8; file++) {
+            int square = rank * 8 + file;
+
+            if ((*fen > 'a' && *fen < 'z') || (*fen > 'A' && *fen < 'Z')) {
+                int piece = char_pieces[*fen];
+                set_bit(bitboards[piece], square);
+                *fen++;
+            } 
+            
+            if (*fen >= '0' && *fen <= '9') {
+                int offset = *fen - '0';
+
+                int piece = -1;
+                for (int bb_piece = P; bb_piece <= k; bb_piece++) {
+                    if (get_bit(bitboards[bb_piece], square)) {
+                        piece = bb_piece;
+                    }
+                }
+
+                if (piece == -1) {
+                    file--;
+                }
+
+                file += offset;
+                *fen++;
+            }
+            
+            if (*fen == '/') {
+                *fen++;
+            }
+        }
+    }
+
+    *fen++;
+    side = *fen == 'w' ? white : black;
+
+    fen += 2;
+    while (*fen != ' ') {
+        switch (*fen) {
+            case 'K': castle |= wk; break;
+            case 'Q': castle |= wq; break;
+            case 'k': castle |= bk; break;
+            case 'q': castle |= bq; break;
+            case '-': break;
+        }
+        *fen++;
+    }
+
+    *fen++;
+    if (*fen != '-') {
+        int file = fen[0] - 'a';
+        int rank = 8 - fen[1] + '0';
+
+        enpassant = rank*8 + file;
+    } else {
+        enpassant = no_sq;
+    }
+
+
+    for (int piece = P; piece <= K; piece++) {
+        occupancies[white] |= bitboards[piece];
+    }
+    for (int piece = p; piece <= k; piece++) {
+        occupancies[black] |= bitboards[piece];
+    }
+
+    occupancies[both] = occupancies[white] | occupancies[black];
 }
 
 U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask) {
@@ -328,6 +611,275 @@ U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask) {
     }
 
     return occupancy;
+}
+
+void init_sliders_attacks(int bishop) {
+    for (int square=0; square<64; square++) {
+        bishop_masks[square] = mask_bishop_attacks(square);
+        rook_masks[square] = mask_rook_attacks(square);
+
+        U64 attack_mask = bishop ? bishop_masks[square] : rook_masks[square];
+        
+        int relevant_bits_count = count_bits(attack_mask);
+
+        int occupancy_indicies = 1 << relevant_bits_count;
+
+        for (int index=0; index < occupancy_indicies; index++) {
+            if (bishop) {
+                U64 occupancy = set_occupancy(index, relevant_bits_count, attack_mask);
+                
+                int magic_index = occupancy * bishop_magic_numbers[square] >> (64 - bishop_relevant_bits[square]);
+
+                bishop_attacks[square][magic_index] = bishop_attacks_on_the_fly(square, occupancy);
+            } else {
+                U64 occupancy = set_occupancy(index, relevant_bits_count, attack_mask);
+                
+                int magic_index = occupancy * rook_magic_numbers[square] >> (64 - rook_relevant_bits[square]);
+
+                rook_attacks[square][magic_index] = rook_attacks_on_the_fly(square, occupancy);
+            }
+        }
+    }
+}
+
+void init_leapers_attacks() {
+    for (int i=0; i < 64; i++) {
+        pawn_attacks[white][i] = mask_pawn_attacks(white, i);
+        pawn_attacks[black][i] = mask_pawn_attacks(black, i);
+        knight_attacks[i] = mask_knight_attacks(i);
+        king_attacks[i] = mask_king_attacks(i);
+    }
+}
+
+static inline U64 get_bishop_attacks(int square, U64 occupancy) {
+    occupancy &= bishop_masks[square];
+    occupancy *= bishop_magic_numbers[square];
+    occupancy >>= 64 - bishop_relevant_bits[square];
+
+    return bishop_attacks[square][occupancy];
+}
+
+static inline U64 get_rook_attacks(int square, U64 occupancy) {
+    occupancy &= rook_masks[square];
+    occupancy *= rook_magic_numbers[square];
+    occupancy >>= 64 - rook_relevant_bits[square];
+
+    return rook_attacks[square][occupancy];
+}
+
+static inline U64 get_queen_attacks(int square, U64 occupancy) {
+    U64 queen_attacks = 0ULL;
+
+    U64 bishop_occupancies = occupancy;
+    U64 rook_occupancies = occupancy;
+    
+    bishop_occupancies &= bishop_masks[square];
+    bishop_occupancies *= bishop_magic_numbers[square];
+    bishop_occupancies >>= 64 - bishop_relevant_bits[square];
+
+    queen_attacks |= bishop_attacks[square][bishop_occupancies];
+
+    rook_occupancies &= rook_masks[square];
+    rook_occupancies *= rook_magic_numbers[square];
+    rook_occupancies >>= 64 - rook_relevant_bits[square];
+
+    queen_attacks |= rook_attacks[square][rook_occupancies];
+
+    return queen_attacks;
+}
+
+void init_all() {
+    init_leapers_attacks();
+    init_sliders_attacks(bishop);
+    init_sliders_attacks(rook);
+}
+
+static inline int is_square_attacked(int square, int side) {
+    if (side == white && (pawn_attacks[black][square] & bitboards[P])) return 1;
+    if (side == black && (pawn_attacks[white][square] & bitboards[p])) return 1;
+    if (knight_attacks[square] & (side == white ? bitboards[N] : bitboards[n])) return 1;
+    if (king_attacks[square] & (side == white ? bitboards[K] : bitboards[k])) return 1;
+    
+    if (get_bishop_attacks(square, occupancies[both]) & (side == white ? bitboards[B] : bitboards[b])) return 1;
+    if (get_rook_attacks(square, occupancies[both]) & (side == white ? bitboards[R] : bitboards[r])) return 1;
+    if (get_queen_attacks(square, occupancies[both]) & (side == white ? bitboards[Q] : bitboards[q])) return 1;
+    
+    return 0;
+}
+
+void print_attacked_squares(int side) {
+    printf("\n");
+    for (int rank = 0; rank < 8; rank++) {
+        for (int file = 0; file < 8; file++) {
+            int square = rank * 8 + file;
+
+            if (!file) {
+                printf("%d ", 8-rank);
+            }
+
+            printf(" %d", is_square_attacked(square, side) != 0);
+        }
+
+        printf("\n");
+    }
+    printf("\n   a b c d e f g h \n\n");
+    // printf("\n    Bitboard: %llud\n\n", board);
+}
+
+static inline void generate_moves() {
+    int source_square;
+    int target_square;
+    U64 bitboard, attacks;
+
+    for (int piece = P; piece < k; piece++) {
+        bitboard = bitboards[piece];
+
+        // pawn moves and castles
+        if (side == white) {
+            if (piece == P) {
+                while (bitboard) {
+                    source_square = get_lsb1_index(bitboard);
+                    target_square = source_square - 8;
+
+                    if (!(target_square < a8) && !get_bit(occupancies[both], target_square)) {
+                        if (source_square >= a7 && source_square <= h7) {
+                            
+                        } else {
+                            if (source_square >= a2 && source_square <= h2 && !get_bit(occupancies[both], target_square - 8)) {
+
+                            }
+                        }
+                    }
+
+                    attacks = pawn_attacks[side][source_square] & occupancies[black];
+                    while(attacks) {
+                        target_square = get_lsb1_index(attacks);
+
+                        if (!(target_square < a8) && !get_bit(occupancies[both], target_square)) {
+                            if (source_square >= a7 && source_square <= h7) {
+                                
+                            } else {
+                                if (source_square >= a2 && source_square <= h2 && !get_bit(occupancies[both], target_square - 8)) {
+
+                                }
+                            }
+                        }
+                        
+                        pop_bit(attacks, target_square);
+                    }
+
+                    if (Enpassant != no_sq) {
+                        U64 enpassant_attacks = pawn_attacks[side][source_square] & (1ULL << enpassant);
+                        if (enpassant_attacks) {
+                            int target_enpassant = get_lsb1_index(enpassant_attacks);
+                        }
+                    }
+
+                    pop_bit(bitboard, source_square);
+                }
+            }
+            if (piece == K) {
+                if (castle & wk) {
+                    if (!get_bit(occupancies[both], f1) && !get_bit(occupancies[both], g1)) {
+                        if (!is_square_attacked(e1, black) && !is_square_attacked(g1, black)) {
+
+                        }
+                    }
+                }
+
+                if (castle & wq) {
+                    if (!get_bit(occupancies[both], d1) && !get_bit(occupancies[both], c1) && !get_bit(occupancies[both], b1)) {
+                        if (!is_square_attacked(e1, black) && !is_square_attacked(d1, black)) {
+                            
+                        }
+                    }
+                }
+            }
+        } else {
+            if (piece == p) {
+                while (bitboard) {
+                    source_square = get_lsb1_index(bitboard);
+                    target_square = source_square + 8;
+
+                    if (!(target_square > h1) && !get_bit(occupancies[both], target_square)) {
+                        if (source_square >= a2 && source_square <= h2) {
+                            
+                        } else {
+                            if (source_square >= a7 && source_square <= h7 && !get_bit(occupancies[both], target_square + 8)) {
+
+                            }
+                        }
+                    }
+
+                    attacks = pawn_attacks[side][source_square] & occupancies[white];
+                    while(attacks) {
+                        target_square = get_lsb1_index(attacks);
+
+                        if (!(target_square > h1) && !get_bit(occupancies[both], target_square)) {
+                            if (source_square >= a2 && source_square <= h2) {
+                                
+                            } else {
+                                if (source_square >= a7 && source_square <= h7 && !get_bit(occupancies[both], target_square + 8)) {
+
+                                }
+                            }
+                        }
+                        
+                        pop_bit(attacks, target_square);
+                    }
+
+                    if (Enpassant != no_sq) {
+                        U64 enpassant_attacks = pawn_attacks[side][source_square] & (1ULL << enpassant);
+                        if (enpassant_attacks) {
+                            int target_enpassant = get_lsb1_index(enpassant_attacks);
+                        }
+                    }
+
+                    pop_bit(bitboard, source_square);
+                }
+            }
+            if (piece == k) {
+                if (castle & bk) {
+                    if (!get_bit(occupancies[both], f8) && !get_bit(occupancies[both], g8)) {
+                        if (!is_square_attacked(e8, white) && !is_square_attacked(g8, white)) {
+
+                        }
+                    }
+                }
+
+                if (castle & bq) {
+                    if (!get_bit(occupancies[both], d8) && !get_bit(occupancies[both], c8) && !get_bit(occupancies[both], b8)) {
+                        if (!is_square_attacked(e8, white) && !is_square_attacked(d8, white)) {
+                            
+                        }
+                    }
+                }
+            }
+        }
+
+        if ((side == white) ? piece == N : piece == n) {
+            while (bitboard) {
+                source_square = get_lsb1_index(bitboard);
+
+                attacks = knight_attacks[source_square] & (side == white ? ~occupancies[white] : ~occupancies[black]);
+
+                while (attacks) {
+                    target_square = get_lsb1_index(attacks);
+
+                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+
+                    } else {
+                        
+                    }
+
+                    pop_bit(attacks, target_square);
+                }
+
+                pop_bit(bitboard, source_square);
+            }
+        } 
+        
+    }
 }
 
 unsigned int state = 1804289383;
@@ -358,7 +910,68 @@ U64 generate_magic_number() {
     return get_random_U64_number() & get_random_U64_number() & get_random_U64_number();
 }
 
+U64 find_magic_number(int square, int relevant_bits, int bishop) {
+    U64 occupancies[4096];
+    U64 attacks[4096];
+    U64 used_attacks[4096];
+
+    U64 attack_mask = bishop ? mask_bishop_attacks(square) : mask_rook_attacks(square);
+
+    int occupancy_indicies = 1 << relevant_bits;
+    for (int i = 0; i < occupancy_indicies; i++) {
+        occupancies[i] = set_occupancy(i, relevant_bits, attack_mask);
+
+        attacks[i] = bishop ? bishop_attacks_on_the_fly(square, occupancies[i]) : rook_attacks_on_the_fly(square, occupancies[i]);
+    }
+
+    for (int random_count = 0; random_count < 100000000; random_count++) {
+        U64 magic_number = generate_magic_number();
+
+        if (count_bits((attack_mask * magic_number) & 0xFF00000000000000) < 6) continue;
+
+        memset(used_attacks, 0ULL, sizeof(used_attacks));
+
+        int i, fail;
+
+        for (i = 0, fail = 0; !fail && i < occupancy_indicies; i++) {
+            int magic_i = (int)((occupancies[i] * magic_number) >> (64 - relevant_bits));
+        
+            if (used_attacks[magic_i] == 0ULL) 
+                used_attacks[magic_i] = attacks[i];
+
+            else if (used_attacks[i] != attacks[i])
+                fail = 1;
+        }
+
+        if (!fail)
+            return magic_number;
+    }
+
+    printf("Magic number fails!\n");
+    return 0ULL;
+}
+
+void init_magic_numbers() {
+    for (int square = 0; square < 64; square++) {
+        rook_magic_numbers[square] = find_magic_number(square, rook_relevant_bits[square], rook); 
+    }
+
+    for (int square = 0; square < 64; square++) {
+        bishop_magic_numbers[square] = find_magic_number(square, bishop_relevant_bits[square], bishop); 
+    }
+
+    // for (int square = 0; square < 64; square++) {
+    //     printf(" 0x%llxULL,\n", find_magic_number(square, rook_relevant_bits[square], rook)); 
+    // }
+    // printf("\n\n\n");
+
+    // for (int square = 0; square < 64; square++) {
+    //     printf(" 0x%llxULL,\n", find_magic_number(square, bishop_relevant_bits[square], bishop)); 
+    // }
+}
+
 int main () {
-    init_leapers_attacks();
-   
+    init_all();
+
+    return 0;
 }
