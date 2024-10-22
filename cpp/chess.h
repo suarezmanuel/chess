@@ -20,8 +20,8 @@ struct GameData {
     bool hasBlackRightRookMoved = false;
     bool hasBlackLeftRookMoved = false;
 
-    int prevX = -1;
-    int prevY = -1;
+    int prevX = -2;
+    int prevY = -2;
 
     char turn = 'w';
 };
@@ -34,7 +34,7 @@ struct Move {
     int startY;
     int targetX;
     int targetY;
-    char promotion;  // '\0' if no promotion
+    char promotion ='\0';  // '\0' if no promotion
 };
 
 PositionsMap whitePositions = {

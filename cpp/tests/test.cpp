@@ -66,11 +66,9 @@ void perft_record(std::string board[8][8],
         }
 
         std::vector<Move> possibleMoves;
-        if (g.turn == 'w') {
-            possibleMoves = getValidMovesWhite(board, whitePositions, g);
-        } else {
-            possibleMoves = getValidMovesBlack(board, blackPositions, g);
-        }
+        PositionsMap positions = (g.turn == 'w') ? whitePositions : blackPositions;
+        possibleMoves = getValidMovesOfCurrentTurn(board, blackPositions, g);
+
 
         if (possibleMoves.empty()) return;
 
@@ -214,11 +212,8 @@ void write_perft_record (const std::string& fen, int depth) {
 int perft(std::string board[8][8], PositionsMap& whitePositions, PositionsMap& blackPositions, int depth, GameData& g, int initial_depth) {
 
     std::vector<Move> possibleMoves;
-    if (g.turn == 'w') {
-        possibleMoves = getValidMovesWhite(board, whitePositions, g);
-    } else {
-        possibleMoves = getValidMovesBlack(board, blackPositions, g);
-    }
+    PositionsMap positions = (g.turn == 'w') ? whitePositions : blackPositions;
+    possibleMoves = getValidMovesOfCurrentTurn(board, positions, g);
 
     if (depth == 0) return 1;
     if (possibleMoves.size() == 0) return 0;
@@ -281,17 +276,17 @@ void test_perft (std::string fen, int depth, int expected_val) {
     EXPECT_EQ(perft(board, whitePositions, blackPositions, depth, gg, depth), expected_val);
 }
 
-// TEST(perft_board_1, depth_1) {
-//     test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 1, 20);
-// }
+TEST(perft_board_1, depth_1) {
+    test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 1, 20);
+}
 
-// TEST(perft_board_1, depth_2) {
-//     test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 2, 400);
-// }
+TEST(perft_board_1, depth_2) {
+    test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 2, 400);
+}
 
-// TEST(perft_board_1, depth_3) {
-//     test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 3, 8902);
-// }
+TEST(perft_board_1, depth_3) {
+    test_perft("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ", 3, 8902);
+}
 
 
 TEST(perft_board_2, depth_1) {
@@ -300,70 +295,76 @@ TEST(perft_board_2, depth_1) {
 
 TEST(perft_board_2, depth_2) {
     test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2, 2039);
-    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2);
 }
 
 TEST(perft_board_2, depth_3) {
     test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862);
-    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3);
 }
 
-TEST(perft_board_2, depth_4) {
-    // test_perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862);
-    write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4);
+
+TEST(perft_board_3, depth_1) {
+    test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 1, 14);
 }
 
-// TEST(perft_board_3, depth_1) {
-//     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 1, 14);
+TEST(perft_board_3, depth_2) {
+    test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2, 191);
+}
+
+TEST(perft_board_3, depth_3) {
+    test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 3, 2812);
+}
+
+
+TEST(perft_board_4, depth_1) {
+    test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 1, 6);
+}
+
+TEST(perft_board_4, depth_2) {
+    test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 2, 264);
+}
+
+TEST(perft_board_4, depth_3) {
+    test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 3, 9467);
+}
+
+
+TEST(perft_board_5, depth_1) {
+    test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 1, 44);
+}
+
+TEST(perft_board_5, depth_2) {
+    test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 2, 1486);
+}
+
+TEST(perft_board_5, depth_3) {
+    test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 3, 62379);
+}
+
+
+TEST(perft_board_6, depth_1) {
+    test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 1, 46);
+}
+
+TEST(perft_board_6, depth_2) {
+    test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 2, 2079);
+}
+
+TEST(perft_board_6, depth_3) {
+    test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 3, 89890);
+}
+
+
+// TEST(perft_record_2, depth_2) {
+//     write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 2);
 // }
 
-// TEST(perft_board_3, depth_2) {
-//     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2, 191);
+// TEST(perft_record_2, depth_3) {
+//     write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3);
 // }
 
-// TEST(perft_board_3, depth_3) {
-//     test_perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 3, 2812);
+// TEST(perft_record_2, depth_4) {
+//     write_perft_record("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4);
 // }
-
-
-// TEST(perft_board_4, depth_1) {
-//     test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 1, 6);
-// }
-
-// TEST(perft_board_4, depth_2) {
-//     test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 2, 264);
-// }
-
-// TEST(perft_board_4, depth_3) {
-//     test_perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 3, 9467);
-// }
-
-
-// TEST(perft_board_5, depth_1) {
-//     test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 1, 44);
-// }
-
-// TEST(perft_board_5, depth_2) {
-//     test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 2, 1486);
-// }
-
-// TEST(perft_board_5, depth_3) {
-//     test_perft("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 3, 62379);
-// }
-
-
-// TEST(perft_board_6, depth_1) {
-//     test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 1, 46);
-// }
-
-// TEST(perft_board_6, depth_2) {
-//     test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 2, 2079);
-// }
-
-// TEST(perft_board_6, depth_3) {
-//     test_perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 3, 89890);
-// }
-
 
 int main (int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

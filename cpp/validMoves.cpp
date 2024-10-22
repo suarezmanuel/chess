@@ -1,16 +1,13 @@
 #include "chess.h"
 
-inline bool isBad(const std::string& piece) {
-    return piece.empty();
-}
 
 bool checkColor(const std::string& piece, char color) {
-    if (isBad(piece)) return false;
+    if (piece.empty()) return false;
     return piece[0] == color;
 }
 
 bool checkPiece(const std::string& piece, char pieceType) {
-    if (isBad(piece)) return false;
+    if (piece.empty()) return false;
     return piece[1] == pieceType;
 }
 
@@ -150,54 +147,60 @@ std::vector<Move> validMovesFromArray(std::string board[8][8], int startX, int s
 
 std::vector<Move> pawnMoves(std::string board[8][8], char color, int xPos, int yPos, GameData& g) {
     std::vector<Move> moves;
-    char oppColor = (color == 'w') ? 'b' : 'w';
-    int direction = (color == 'w') ? -1 : 1;
-    int startRow = (color == 'w') ? 6 : 1;
-
+    bool isWhite = color == 'w';
+    char oppColor; int direction; int startRow;
+    
+    if (isWhite) {
+        oppColor = 'b';
+        direction = -1;
+        startRow = 6;
+    } else {
+        oppColor = 'w';
+        direction = 1;
+        startRow = 1;
+    }
+    
+    int yNew = yPos+direction;
     // Single forward move
-    if (yPos + direction >= 0 && yPos + direction < 8 && isBad(board[yPos + direction][xPos])) {
-        moves.push_back({xPos, yPos, xPos, yPos + direction});
+    if (yNew >= 0 && yNew < 8 && board[yNew][xPos].empty()) {
+        moves.push_back({xPos, yPos, xPos, yNew});
 
-        // Double forward move from starting position
-        if (yPos == startRow && isBad(board[yPos + 2 * direction][xPos])) {
-            moves.push_back({xPos, yPos, xPos, yPos + 2 * direction});
+        // if you can't move once you can't move twice
+        yNew += direction;
+        // it will be in bounds because its on a starting row
+        if (yPos == startRow && board[yNew][xPos].empty()) {
+            moves.push_back({xPos, yPos, xPos, yNew});
         }
     }
 
-    // Captures
-    for (int dx = -1; dx <= 1; dx += 2) {
-        int x = xPos + dx;
-        int y = yPos + direction;
-        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
-            if (checkColor(board[y][x], oppColor)) {
-                moves.push_back({xPos, yPos, x, y});
-            }
+    // eating pieces normally
+    int x = xPos - 1;
+    int y = yPos + direction;
+    if (y >= 0 && y < 8) {
+        if (x >= 0 && x < 8 && checkColor(board[y][x], oppColor)) {
+            moves.push_back({xPos, yPos, x, y});
+        }
+        x = xPos + 1;
+        if (x >= 0 && x < 8 && checkColor(board[y][x], oppColor)) {
+            moves.push_back({xPos, yPos, x, y});
         }
     }
 
-    // En passant
-    // we only update en passant for opponent so no color check needed
-    if (g.prevX != -1 && g.prevY != -1) {
-        if (abs(g.prevX - xPos) == 1 && abs(g.prevY - yPos) == 1) {
-            // if (yPos == (color == 'w' ? 3 : 4)) {
-            //     int targetY = yPos + direction;
-            //     moves.push_back({xPos, yPos, g.prevX, targetY});
-            // }
-            moves.push_back({xPos, yPos, g.prevX, g.prevY});
-        }
+    // eating pieces en passant
+    // prevX, prevY are -2 if uninitialized so we need no check
+    if (abs(g.prevX - xPos) == 1 && abs(g.prevY - yPos) == 1) {
+        moves.push_back({xPos, yPos, g.prevX, g.prevY});
     }
 
     // Pawn promotion
     std::vector<Move> promotionMoves;
     for (auto& move : moves) {
         if (move.targetY == 0 || move.targetY == 7) {
-            for (char promo : {'q', 'r', 'b', 'n'}) {
-                Move promoMove = move;
-                promoMove.promotion = promo;
-                promotionMoves.push_back(promoMove);
-            }
+            promotionMoves.push_back({move.startX, move.startY, move.targetX, move.targetY, 'q'});
+            promotionMoves.push_back({move.startX, move.startY, move.targetX, move.targetY, 'r'});
+            promotionMoves.push_back({move.startX, move.startY, move.targetX, move.targetY, 'b'});
+            promotionMoves.push_back({move.startX, move.startY, move.targetX, move.targetY, 'n'});
         } else {
-            move.promotion = '\0';
             promotionMoves.push_back(move);
         }
     }
@@ -275,26 +278,26 @@ std::vector<Move> castleMoves(std::string board[8][8], char color, GameData& g) 
     if (color == 'w') {
         // Queenside castling
         if (!g.hasWhiteLeftRookMoved) {
-            if (board[yPos][0] == "wr" && isBad(board[yPos][1]) && isBad(board[yPos][2]) && isBad(board[yPos][3]) && !isInCheck(board, color, {3, yPos})) {
+            if (board[yPos][0] == "wr" && board[yPos][1].empty() && board[yPos][2].empty() && board[yPos][3].empty() && !isInCheck(board, color, {3, yPos})) {
                 moves.push_back({4, yPos, 2, yPos});
             }
         }
         // Kingside castling
         if (!g.hasWhiteRightRookMoved) {
-            if (board[yPos][7] == "wr" && isBad(board[yPos][5]) && isBad(board[yPos][6]) && !isInCheck(board, color, {5, yPos})) {
+            if (board[yPos][7] == "wr" && board[yPos][5].empty() && board[yPos][6].empty() && !isInCheck(board, color, {5, yPos})) {
                 moves.push_back({4, yPos, 6, yPos});
             }
         }
     } else {
         // Queenside castling
         if (!g.hasBlackLeftRookMoved) {
-            if (board[yPos][0] == "br" && isBad(board[yPos][1]) && isBad(board[yPos][2]) && isBad(board[yPos][3]) && !isInCheck(board, color, {3, yPos})) {
+            if (board[yPos][0] == "br" && board[yPos][1].empty() && board[yPos][2].empty() && board[yPos][3].empty() && !isInCheck(board, color, {3, yPos})) {
                 moves.push_back({4, yPos, 2, yPos});
             }
         }
         // Kingside castling
         if (!g.hasBlackRightRookMoved) {
-            if (board[yPos][7] == "br" && isBad(board[yPos][5]) && isBad(board[yPos][6]) && !isInCheck(board, color, {5, yPos})) {
+            if (board[yPos][7] == "br" && board[yPos][5].empty() && board[yPos][6].empty() && !isInCheck(board, color, {5, yPos})) {
                 moves.push_back({4, yPos, 6, yPos});
             }
         }
@@ -356,25 +359,14 @@ std::vector<Move> getValidMoves(std::string board[8][8], const std::string& piec
     return moves;
 }
 
-std::vector<Move> getValidMovesWhite(std::string board[8][8], PositionsMap& whitePositions, GameData& g) {
-    std::vector<Move> moves;
-    for (const auto& [key, value] : whitePositions) {
-        int x = key.first;
-        int y = key.second;
-        std::string pieceStr = "w" + std::string(1, value);
-        std::vector<Move> pieceMoves = getValidMoves(board, pieceStr, x, y, whitePositions, g);
-        moves.insert(moves.end(), pieceMoves.begin(), pieceMoves.end());
-    }
-    return moves;
-}
 
-std::vector<Move> getValidMovesBlack(std::string board[8][8], PositionsMap& blackPositions, GameData& g) {
+std::vector<Move> getValidMovesOfCurrentTurn(std::string board[8][8], PositionsMap& positions, GameData& g) {
     std::vector<Move> moves;
-    for (const auto& [key, value] : blackPositions) {
+    for (const auto& [key, value] : positions) {
         int x = key.first;
         int y = key.second;
-        std::string pieceStr = "b" + std::string(1, value);
-        std::vector<Move> pieceMoves = getValidMoves(board, pieceStr, x, y, blackPositions, g);
+        std::string pieceStr = g.turn + std::string(1, value);
+        std::vector<Move> pieceMoves = getValidMoves(board, pieceStr, x, y, positions, g);
         moves.insert(moves.end(), pieceMoves.begin(), pieceMoves.end());
     }
     return moves;

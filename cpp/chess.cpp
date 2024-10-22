@@ -107,12 +107,12 @@ void movePiece(std::string boardArray[8][8], const Move& move, PositionsMap& whi
             g.prevY = (startY + targetY) / 2;
         } else {
             // clear en passant
-            g.prevX = -1;
-            g.prevY = -1;
+            g.prevX = -2;
+            g.prevY = -2;
         }
     } else {
-        g.prevX = -1;
-        g.prevY = -1;
+        g.prevX = -2;
+        g.prevY = -2;
     }
 
     // Update castling parameters
@@ -234,8 +234,8 @@ void setBoardFromFen(std::string board[8][8], const std::string fen, GameData& g
         gg.prevX = enPassantStr[0] - 'a';
         gg.prevY = 8 - (enPassantStr[1] - '0');
     } else {
-        gg.prevX = -1;
-        gg.prevY = -1;
+        gg.prevX = -2;
+        gg.prevY = -2;
     }
 
     // take first character of the turn string
