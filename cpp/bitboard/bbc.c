@@ -1,5 +1,10 @@
 #include <stdio.h>
 #include <string.h>
+#ifdef WIN64
+    #include <windows.h>
+#else
+    # include <sys/time.h>
+#endif
 
 #define U64 unsigned long long
 
@@ -89,6 +94,10 @@ char promoted_pieces[] = {[Q] = 'q', [R] = 'r', [B] = 'b', [N] = 'n', [q] = 'q',
 
 void print_move(int move) {
     printf("%s%s%c\n", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)]);
+}
+
+void print_move_count(int move, long count) {
+    printf("%s%s%c: %ld\n", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)], count);
 }
 
 void print_move_list(moves *move_list) {
@@ -994,7 +1003,7 @@ static inline void generate_moves(moves* move_list) {
             if (piece == K) {
                 if (castle & wk) {
                     if (!get_bit(occupancies[both], f1) && !get_bit(occupancies[both], g1)) {
-                        if (!is_square_attacked(e1, black) && !is_square_attacked(g1, black)) {
+                        if (!is_square_attacked(e1, black) && !is_square_attacked(f1, black)) {
                             add_move(move_list, encode_move(e1, g1, piece, 0, 0, 0, 0, 1));
                         }
                     }
@@ -1186,35 +1195,65 @@ static inline void generate_moves(moves* move_list) {
     }
 }
 
-int main () {
-    
-    init_all();
-    
-    parse_fen(tricky_position);
-    print_board();
+int get_time_ms()
+{
+    #ifdef WIN64
+        return GetTickCount();
+    #else
+        struct timeval time_value;
+        gettimeofday(&time_value, NULL);
+        return time_value.tv_sec * 1000 + time_value.tv_usec / 1000;
+    #endif
+}
+
+long nodes = 0;
+long local_nodes = 0;
+
+static inline void perft_driver(int depth) {
+
+    if (depth == 0) {
+        nodes++;
+        local_nodes++;
+        return;
+    }
 
     moves moves;
 
     generate_moves(&moves);
 
     for (int i=0; i < moves.count; i++) {
-        // init move
-        int move = moves.moves[i];
-        
-        // presereve board state
         copy_board();
 
-        // make move
-        make_move(move, all_moves);
-        print_board();
-        // print_bitboard(bitboards[get_move_piece(move)]);
-        getchar();
+        if (!make_move(moves.moves[i], all_moves))
+            continue;
+        perft_driver(depth-1);
 
+        // if (depth == 1) {
+        //     print_move_count(moves.moves[i], local_nodes);
+        //     local_nodes = 0;
+        // }
+        
         take_back();
-        print_board();
-        // print_bitboard(bitboards[get_move_piece(move)]);
-        getchar();
     }
+}
 
+
+int main()
+{
+    // init all
+    init_all();
+    
+    // parse fen
+    parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
+    print_board();
+
+    // start tracking time
+    int start = get_time_ms();
+    
+    perft_driver(5);
+
+    // time taken to execute program
+    printf("time taken to execute: %d ms\n", get_time_ms() - start);
+    printf("nodes: %d\n", nodes);
     return 0;
 }
