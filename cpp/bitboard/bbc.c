@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #ifdef WIN64
     #include <windows.h>
 #else
@@ -1222,38 +1223,226 @@ static inline void perft_driver(int depth) {
     generate_moves(&moves);
 
     for (int i=0; i < moves.count; i++) {
+
         copy_board();
 
         if (!make_move(moves.moves[i], all_moves))
             continue;
+
         perft_driver(depth-1);
 
-        // if (depth == 1) {
-        //     print_move_count(moves.moves[i], local_nodes);
-        //     local_nodes = 0;
-        // }
-        
         take_back();
     }
 }
 
+void perft_test(int depth) {
+
+    printf("\n Performance test\n\n");
+    moves moves;
+
+    generate_moves(&moves);
+
+    int start = get_time_ms();
+
+    for (int i=0; i < moves.count; i++) {
+        
+        copy_board();
+
+        if (!make_move(moves.moves[i], all_moves))
+            continue;
+
+        long sum_nodes = nodes;
+
+        perft_driver(depth-1);
+        
+        long old_nodes = nodes - sum_nodes;
+
+        take_back();
+
+        // print_move(moves.moves[i]);
+        printf("%s%s%c: %ld\n", square_to_coordinates[get_move_source(moves.moves[i])]
+                         , square_to_coordinates[get_move_target(moves.moves[i])]
+                         , promoted_pieces[get_move_promoted(moves.moves[i])]
+                         , old_nodes);
+    }
+
+    printf("\n Depth: %d\n", depth);
+    printf(" Nodes: %ld\n", nodes);
+    printf(" Time: %d\n\n", get_time_ms()-start);
+}
+
+// search for best move
+void search_position(int depth) {
+    // best move placeholders
+    printf("bestmove d2d4\n");
+}
+
+int parse_move(char* move_string) {
+
+    moves moves;
+
+    generate_moves(&moves);
+
+    // coordinate e.g. a1b2 to square int 
+    int source_square = (move_string[0]-'a') + (8 - (move_string[1]-'0')) * 8;    
+    int target_square = (move_string[2]-'a') + (8 - (move_string[3]-'0')) * 8;    
+
+    for (int i=0; i < moves.count; i++) {
+        int move = moves.moves[i];
+
+        if (source_square == get_move_source(move) && target_square == get_move_target(move)) {
+            int promoted_piece = get_move_promoted(move);
+
+            if (promoted_piece) {
+                if ((promoted_piece == Q || promoted_piece == q) && move_string[4] == 'q')
+                return move;
+
+                if ((promoted_piece == R || promoted_piece == r) && move_string[4] == 'r')
+                    return move;
+
+                if ((promoted_piece == B || promoted_piece == b) && move_string[4] == 'b')
+                    return move;
+
+                if ((promoted_piece == N || promoted_piece == n) && move_string[4] == 'n')
+                    return move;
+
+                // even if the promotion doesnt make sense
+                continue;
+            }
+            // legal move
+            return move;
+        }
+    }
+
+    // illegal move
+    return 0;
+}
+
+void parse_position(char *command) {
+
+    // position is 8 chars long, move to next string
+    command += 9;
+
+    char *current_char = command;
+
+    // parse startpos
+    if (strncmp(command, "startpos", 8) == 0) 
+        parse_fen(start_position);
+    else {
+        printf("%s\n", current_char);
+
+        current_char = strstr(command, "fen");
+
+        // if no fen present in command
+        if (current_char == NULL) {
+            parse_fen(start_position);
+        } else {
+            // fen is 3 chars long, move to next string
+            current_char += 4;
+
+            parse_fen(current_char);
+        }
+    }
+
+    current_char = strstr(command, "moves");
+
+    if (current_char != NULL) {
+        // moves is 5 chars long
+        current_char += 6;
+
+        while (*current_char) {
+
+            int move = parse_move(current_char);
+
+            if (move == 0) {
+                break;
+            }
+
+            make_move(move, all_moves);
+            // each move is 4 chars long
+            current_char += 5;
+        }
+    }
+    print_board();
+    // printf("%s\n", current_char);
+}
+
+void parse_go(char *command) {
+    int depth = -1;
+
+    char* current_depth = NULL;
+
+    if (current_depth = strstr(command, "depth")) {
+        // depth is 5 chars long
+        depth = atoi(current_depth + 6);
+    } else {
+        // time controls placeholder
+        depth = 2;
+    } 
+
+    search_position(depth);
+    // printf("depth: %d\n", depth); 
+}
+
+void uci_loop() {
+    // reset stdin, stdout
+    setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
+
+    // define input buffer
+    char input[2000];
+
+    printf("id name hhc\n");
+    printf("id name Code hemihemichess\n");
+    printf("uciok\n");
+
+    while(1) {
+        //reset user input
+        memset(input, 0, sizeof(input));
+
+        fflush(stdout);
+
+        // get user input from stdin
+        if (!fgets(input, 2000, stdin))
+            continue;
+
+        if (input[0] == '\n')
+            continue;
+
+        if (strncmp(input, "isready", 7) == 0) {
+            printf("readyok\n");
+        }
+
+        else if (strncmp(input, "position", 8) == 0) {
+            parse_position(input);
+        }
+
+        else if (strncmp(input, "ucinewgame", 10) == 0) {
+            parse_position("position startpos");
+        }
+
+        else if (strncmp(input, "go", 2) == 0) {
+            parse_go(input);
+        }
+
+        else if (strncmp(input, "quit", 4) == 0) {
+            break;
+        }
+
+        else if (strncmp(input, "uci", 3) == 0) {
+            printf("id name hhc\n");
+            printf("id name Code hemihemichess\n");
+            printf("uciok\n");
+        }
+    }
+}
 
 int main()
 {
     // init all
     init_all();
     
-    // parse fen
-    parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
-    print_board();
+    uci_loop();
 
-    // start tracking time
-    int start = get_time_ms();
-    
-    perft_driver(5);
-
-    // time taken to execute program
-    printf("time taken to execute: %d ms\n", get_time_ms() - start);
-    printf("nodes: %d\n", nodes);
     return 0;
 }
