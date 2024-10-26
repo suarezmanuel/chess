@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1271,7 +1272,7 @@ void perft_test(int depth) {
 
     printf("\n Depth: %d\n", depth);
     printf(" Nodes: %ld\n", nodes);
-    printf(" Time: %d\n\n", get_time_ms()-start);
+    printf(" Time: %lld\n\n", get_time_ms()-start);
 }
 
 // extactly matches PNBRQKpnbrqk
@@ -1498,22 +1499,14 @@ static inline int negamax(int alpha, int beta, int depth) {
 #define SAMPLING_COUNT 50
 
 long long int depth_nodes = 0;
-long long int depth_record_nodes = 0;
-long long int depth_nodes_arr[MAX_DEPTH];
 long long int branches_not_taken [MAX_DEPTH];
 long long int sum_branching_factors [MAX_DEPTH];
 long long int perft_startpos_results [MAX_DEPTH] = {20, 400, 8902, 197281,  4865609, 119060324,  3195901860, 84998978956, 2439530234167, 69352859712417};
-long long int thresholds [MAX_DEPTH];
 
-static inline int negamax_record(int alpha, int beta, int depth, int initial_depth, long long int threshold, int count_branches, FILE* fp, long long int starting_time) {
+static inline int negamax_record(int alpha, int beta, int depth, int initial_depth, int count_branches) {
 
     if (depth == 0) {
         depth_nodes++;
-        depth_record_nodes++;
-        if (threshold != 0 && fp != NULL && depth_record_nodes >= threshold) {
-            depth_record_nodes = 0;
-            fprintf(fp, "%.4f %lld\n", initial_depth-1 + ((float)depth_nodes/(float)depth_nodes_arr[initial_depth-1]), get_time_ms()-starting_time);
-        }
         return evaluate();
     }
 
@@ -1534,7 +1527,6 @@ static inline int negamax_record(int alpha, int beta, int depth, int initial_dep
     if (count_branches) {
         sum_branching_factors[initial_depth-depth] += moves.count;
     }
-    
 
     for (int count = 0; count < moves.count; count++) {
         copy_board();
@@ -1548,7 +1540,7 @@ static inline int negamax_record(int alpha, int beta, int depth, int initial_dep
 
         legal_moves++;
 
-        int score = -negamax_record(-beta, -alpha, depth-1, initial_depth, threshold, count_branches, fp, starting_time);
+        int score = -negamax_record(-beta, -alpha, depth-1, initial_depth, count_branches);
 
         ply--;
         take_back();
@@ -1571,7 +1563,6 @@ static inline int negamax_record(int alpha, int beta, int depth, int initial_dep
         if (old_alpha != alpha) {
             best_move = best_sofar;
         }
-
     }
 
     if (legal_moves == 0) {
@@ -1583,13 +1574,12 @@ static inline int negamax_record(int alpha, int beta, int depth, int initial_dep
         }
     }
 
-    // when move fails low
     return alpha;
 }
 
 void record (int depth) {
 
-    FILE* fp = fopen("data.txt", "w");
+    FILE* fp = fopen("./records/data.txt", "w");
     if (fp == NULL) {
         printf("error opening data.txt");
         return;
@@ -1597,31 +1587,16 @@ void record (int depth) {
 
     for (int i=1; i <= min(MAX_DEPTH, depth); i++){
         depth_nodes = 0;
-        negamax_record(-50000, 50000, i, i, 0, i == min(MAX_DEPTH, depth), NULL, 0);
-        depth_nodes_arr[i-1] = depth_nodes;
-        thresholds[i-1] = depth_nodes/SAMPLING_COUNT; 
-        printf("depth %d node count: %lld\n", i, depth_nodes);
+        negamax_record(-50000, 50000, i, i, i == min(MAX_DEPTH, depth));
+        printf("node count at depth %d: %lld\n", i, depth_nodes);
     }
 
-    printf("\nbranches not taken: \n");
+    printf("\n");
+    // the printing values of depth_nodes, branch_factors is different because branch_factors is cummulative
     for (int i=0; i < min(MAX_DEPTH, depth); i++) {
-        printf("depth %d: %lld\n", i+1, branches_not_taken[i]);
-        printf("nodes: %lld, nodes without cutting: %lld, percentage: %lld%%\n", sum_branching_factors[i], perft_startpos_results[i], 100*(perft_startpos_results[i]-sum_branching_factors[i])/sum_branching_factors[i]);
+        printf("branches not taken at depth %d: %lld\n", i+1, branches_not_taken[i]);
+        printf("nodes with cutting: %lld, nodes without cutting: %lld, percentage saved: %lld%%\n\n", sum_branching_factors[i], perft_startpos_results[i], 100*(perft_startpos_results[i]-sum_branching_factors[i])/sum_branching_factors[i]);
         fprintf(fp, "%d %lld %lld\n", i+1, sum_branching_factors[i], perft_startpos_results[i]);
-    }
-
-    fclose(fp);
-
-    fp = fopen("data2.txt", "w");
-    if (fp == NULL) {
-        printf("error opening data.txt");
-        return;
-    }
-
-    depth_nodes = 0;
-    long long int start_time = get_time_ms();
-    for (int i=1; i <= min(MAX_DEPTH, depth); i++) {
-        negamax_record(-50000, 50000, i, i, thresholds[i-1], 0, fp, start_time);
     }
 
     fclose(fp);

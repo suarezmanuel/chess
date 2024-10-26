@@ -1,3 +1,4 @@
+#include "bbc.c"
 
 unsigned int state = 1804289383;
 

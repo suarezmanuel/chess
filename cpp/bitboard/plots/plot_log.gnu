@@ -12,5 +12,5 @@ set logscale y
 set format y '10^{%L}'
 
 # Plot the data
-plot "data.txt" using 1:2 with linespoints lw 2 title "NegMax", \
-     "data.txt" using 1:3 with linespoints lw 2 title "Perft"
+plot "../records/data.txt" using 1:2 with linespoints lw 2 title "NegMax", \
+     "../records/data.txt" using 1:3 with linespoints lw 2 title "Perft"
