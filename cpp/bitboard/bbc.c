@@ -7,6 +7,8 @@
     # include <sys/time.h>
 #endif
 
+#define min(a,b) ((a) < (b) ? (a) : (b))
+
 #define U64 unsigned long long
 
 enum {
@@ -94,7 +96,7 @@ static inline void add_move(moves *move_list, int move) {
 char promoted_pieces[] = {[Q] = 'q', [R] = 'r', [B] = 'b', [N] = 'n', [q] = 'q', [r] = 'r', [b] = 'b', [n] = 'n'};
 
 void print_move(int move) {
-    printf("%s%s%c\n", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)]);
+    printf("%s%s%c", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)]);
 }
 
 void print_move_count(int move, long count) {
@@ -829,6 +831,7 @@ const int castling_rights[64] = {
     13, 15, 15, 15, 12, 15, 15, 14
 };
 
+// returns 1 if valid move, 0 otherwise
 static inline int make_move(int move, int move_flag) {
 
     if (move_flag == all_moves) {
@@ -1196,7 +1199,7 @@ static inline void generate_moves(moves* move_list) {
     }
 }
 
-int get_time_ms()
+long long int get_time_ms()
 {
     #ifdef WIN64
         return GetTickCount();
@@ -1271,10 +1274,371 @@ void perft_test(int depth) {
     printf(" Time: %d\n\n", get_time_ms()-start);
 }
 
+// extactly matches PNBRQKpnbrqk
+// in order to index by the piece enum
+int material_score[12] = {
+    100,
+    300,
+    350,
+    500,
+    1000,
+    10000,
+    -100,
+    -300,
+    -350,
+    -500,
+    -1000,
+    -10000,
+};
+
+const int pawn_score[64] = 
+{
+    90,  90,  90,  90,  90,  90,  90,  90,
+    30,  30,  30,  40,  40,  30,  30,  30,
+    20,  20,  20,  30,  30,  30,  20,  20,
+    10,  10,  10,  20,  20,  10,  10,  10,
+     5,   5,  10,  20,  20,   5,   5,   5,
+     0,   0,   0,   5,   5,   0,   0,   0,
+     0,   0,   0, -10, -10,   0,   0,   0,
+     0,   0,   0,   0,   0,   0,   0,   0
+};
+
+// knight positional score
+const int knight_score[64] = 
+{
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,  10,  10,   0,   0,  -5,
+    -5,   5,  20,  20,  20,  20,   5,  -5,
+    -5,  10,  20,  30,  30,  20,  10,  -5,
+    -5,  10,  20,  30,  30,  20,  10,  -5,
+    -5,   5,  20,  10,  10,  20,   5,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5, -10,   0,   0,   0,   0, -10,  -5
+};
+
+// bishop positional score
+const int bishop_score[64] = 
+{
+     0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   0,  10,  10,   0,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,  10,   0,   0,   0,   0,  10,   0,
+     0,  30,   0,   0,   0,   0,  30,   0,
+     0,   0, -10,   0,   0, -10,   0,   0
+
+};
+
+// rook positional score
+const int rook_score[64] =
+{
+    50,  50,  50,  50,  50,  50,  50,  50,
+    50,  50,  50,  50,  50,  50,  50,  50,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,  10,  20,  20,  10,   0,   0,
+     0,   0,   0,  20,  20,   0,   0,   0
+
+};
+
+// king positional score
+const int king_score[64] = 
+{
+     0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   5,   5,   5,   5,   0,   0,
+     0,   5,   5,  10,  10,   5,   5,   0,
+     0,   5,  10,  20,  20,  10,   5,   0,
+     0,   5,  10,  20,  20,  10,   5,   0,
+     0,   0,   5,  10,  10,   5,   0,   0,
+     0,   5,   5,  -5,  -5,   0,   5,   0,
+     0,   0,   5,   0, -15,   0,  10,   0
+};
+
+// mirror for opponent
+const int mirror_score[128] =
+{
+	a1, b1, c1, d1, e1, f1, g1, h1,
+	a2, b2, c2, d2, e2, f2, g2, h2,
+	a3, b3, c3, d3, e3, f3, g3, h3,
+	a4, b4, c4, d4, e4, f4, g4, h4,
+	a5, b5, c5, d5, e5, f5, g5, h5,
+	a6, b6, c6, d6, e6, f6, g6, h6,
+	a7, b7, c7, d7, e7, f7, g7, h7,
+	a8, b8, c8, d8, e8, f8, g8, h8
+};
+
+static inline int evaluate() {
+
+    int score = 0;
+
+    U64 bitboard;
+
+    int piece, square;
+
+    for (int pp = P; pp <= k; pp++) {
+
+        // get all of the bits with the piece turned on
+        bitboard = bitboards[pp];
+
+        while(bitboard) {
+            piece = pp;
+
+            square = get_lsb1_index(bitboard);
+
+            score += material_score[piece];
+            
+            switch(piece) {
+                case P: score += pawn_score[square]; break;
+                case N: score += knight_score[square]; break;
+                case B: score += bishop_score[square]; break;
+                case R: score += rook_score[square]; break;
+                case K: score += king_score[square]; break;
+
+                case p: score -= pawn_score[mirror_score[square]]; break;
+                case n: score -= knight_score[mirror_score[square]]; break;
+                case b: score -= bishop_score[mirror_score[square]]; break;
+                case r: score -= rook_score[mirror_score[square]]; break;
+                case k: score -= king_score[mirror_score[square]]; break;
+            }
+
+            pop_bit(bitboard, square);
+        }
+    }
+
+    return (side == white) ? score : -score;
+}
+
+// half move counter
+int ply;
+
+int best_move;
+
+static inline int negamax(int alpha, int beta, int depth) {
+
+    if (depth == 0) {
+        return evaluate();
+    }
+
+    nodes++;
+
+    // check if opponent is in check
+    int in_check = is_square_attacked((side==white) ? get_lsb1_index(bitboards[K]) : get_lsb1_index(bitboards[k]), side ^ 1);
+    int legal_moves = 0;
+    int best_sofar;
+
+    // old alpha value
+    int old_alpha = alpha;
+
+    moves moves;
+
+    generate_moves(&moves);
+
+    // for (int i=0; i < moves.count; i++) { print_move(moves.moves[i]); printf("\n"); }
+
+    for (int count = 0; count < moves.count; count++) {
+        copy_board();
+
+        ply++;
+
+        if (make_move(moves.moves[count], all_moves) == 0) {
+            // if make move is illegal
+            ply--;
+            continue;
+        }
+
+        legal_moves++;
+
+        int score = -negamax(-beta, -alpha, depth-1);
+
+        ply--;
+        take_back();
+
+        // fail-hard beta cutoff
+        if (score >= beta) {
+            // move fails high
+            return beta;
+        } 
+
+        // found a better move
+        if (score > alpha) {
+            alpha = score;
+
+            // if root move
+            if (ply == 0) {
+                // best move has best score
+                best_sofar = moves.moves[count];
+            }
+        }
+
+        if (old_alpha != alpha) {
+            best_move = best_sofar;
+        }
+
+    }
+
+    if (legal_moves == 0) {
+
+        if (in_check) {
+            // less than -50000 for it to be in alpha beta bounds
+            // add ply for it to be able to checkmate in bigger depths
+            return -49000 + ply;
+        } else {
+            return 0;
+        }
+    }
+
+    // when move fails low
+    return alpha;
+}
+
+#define MAX_DEPTH 10
+#define SAMPLING_COUNT 50
+
+long long int depth_nodes = 0;
+long long int depth_record_nodes = 0;
+long long int depth_nodes_arr[MAX_DEPTH];
+long long int branches_not_taken [MAX_DEPTH];
+long long int sum_branching_factors [MAX_DEPTH];
+long long int perft_startpos_results [MAX_DEPTH] = {20, 400, 8902, 197281,  4865609, 119060324,  3195901860, 84998978956, 2439530234167, 69352859712417};
+long long int thresholds [MAX_DEPTH];
+
+static inline int negamax_record(int alpha, int beta, int depth, int initial_depth, long long int threshold, int count_branches, FILE* fp, long long int starting_time) {
+
+    if (depth == 0) {
+        depth_nodes++;
+        depth_record_nodes++;
+        if (threshold != 0 && fp != NULL && depth_record_nodes >= threshold) {
+            depth_record_nodes = 0;
+            fprintf(fp, "%.4f %lld\n", initial_depth-1 + ((float)depth_nodes/(float)depth_nodes_arr[initial_depth-1]), get_time_ms()-starting_time);
+        }
+        return evaluate();
+    }
+
+    nodes++;
+
+    // check if opponent is in check
+    int in_check = is_square_attacked((side==white) ? get_lsb1_index(bitboards[K]) : get_lsb1_index(bitboards[k]), side ^ 1);
+    int legal_moves = 0;
+    int best_sofar;
+
+    // old alpha value
+    int old_alpha = alpha;
+
+    moves moves;
+
+    generate_moves(&moves);
+
+    if (count_branches) {
+        sum_branching_factors[initial_depth-depth] += moves.count;
+    }
+    
+
+    for (int count = 0; count < moves.count; count++) {
+        copy_board();
+
+        ply++;
+
+        if (make_move(moves.moves[count], all_moves) == 0) {
+            ply--;
+            continue;
+        }
+
+        legal_moves++;
+
+        int score = -negamax_record(-beta, -alpha, depth-1, initial_depth, threshold, count_branches, fp, starting_time);
+
+        ply--;
+        take_back();
+
+        if (score >= beta) {
+            if (count_branches) {
+                branches_not_taken[initial_depth-depth]++;
+            }
+            return beta;
+        } 
+
+        if (score > alpha) {
+            alpha = score;
+
+            if (ply == 0) {
+                best_sofar = moves.moves[count];
+            }
+        }
+
+        if (old_alpha != alpha) {
+            best_move = best_sofar;
+        }
+
+    }
+
+    if (legal_moves == 0) {
+
+        if (in_check) {
+            return -49000 + ply;
+        } else {
+            return 0;
+        }
+    }
+
+    // when move fails low
+    return alpha;
+}
+
+void record (int depth) {
+
+    FILE* fp = fopen("data.txt", "w");
+    if (fp == NULL) {
+        printf("error opening data.txt");
+        return;
+    }
+
+    for (int i=1; i <= min(MAX_DEPTH, depth); i++){
+        depth_nodes = 0;
+        negamax_record(-50000, 50000, i, i, 0, i == min(MAX_DEPTH, depth), NULL, 0);
+        depth_nodes_arr[i-1] = depth_nodes;
+        thresholds[i-1] = depth_nodes/SAMPLING_COUNT; 
+        printf("depth %d node count: %lld\n", i, depth_nodes);
+    }
+
+    printf("\nbranches not taken: \n");
+    for (int i=0; i < min(MAX_DEPTH, depth); i++) {
+        printf("depth %d: %lld\n", i+1, branches_not_taken[i]);
+        printf("nodes: %lld, nodes without cutting: %lld, percentage: %lld%%\n", sum_branching_factors[i], perft_startpos_results[i], 100*(perft_startpos_results[i]-sum_branching_factors[i])/sum_branching_factors[i]);
+        fprintf(fp, "%d %lld %lld\n", i+1, sum_branching_factors[i], perft_startpos_results[i]);
+    }
+
+    fclose(fp);
+
+    fp = fopen("data2.txt", "w");
+    if (fp == NULL) {
+        printf("error opening data.txt");
+        return;
+    }
+
+    depth_nodes = 0;
+    long long int start_time = get_time_ms();
+    for (int i=1; i <= min(MAX_DEPTH, depth); i++) {
+        negamax_record(-50000, 50000, i, i, thresholds[i-1], 0, fp, start_time);
+    }
+
+    fclose(fp);
+}
+
 // search for best move
 void search_position(int depth) {
-    // best move placeholders
-    printf("bestmove d2d4\n");
+
+    nodes = 0;
+    int score = negamax(-50000, 50000, depth);
+    if (best_move) {
+        printf("info score cp %d depth %d nodes %ld\n", score, depth, nodes);
+        // best move placeholders
+        printf("bestmove ");
+        print_move(best_move);
+        printf("\n");
+    }
 }
 
 int parse_move(char* move_string) {
@@ -1375,12 +1739,14 @@ void parse_go(char *command) {
     if (current_depth = strstr(command, "depth")) {
         // depth is 5 chars long
         depth = atoi(current_depth + 6);
+        search_position(depth);
+    } else if (current_depth = strstr(command, "perft")) {
+        depth = atoi(current_depth + 6);
+        perft_test(depth);
     } else {
         // time controls placeholder
-        depth = 2;
+        search_position(2);
     } 
-
-    search_position(depth);
     // printf("depth: %d\n", depth); 
 }
 
@@ -1442,7 +1808,19 @@ int main()
     // init all
     init_all();
     
-    uci_loop();
+    int debug = 1;
+
+    if (debug) {
+        parse_fen(start_position);
+        record(6);
+        // long long int start = get_time_ms();
+        // negamax(-50000, 50000, 6);
+        // printf("time taken: %lld", get_time_ms()-start);
+        // print_board();
+        // search_position(2);
+    } else {
+        uci_loop();
+    }
 
     return 0;
 }
