@@ -1421,13 +1421,15 @@ static int mvv_lva[12][12] = {
 	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
 };
 
+#define max_ply 246
+
 // like the stockfishes
-int killer_moves[2][246];
-int history_moves[12][246];
+int killer_moves[2][max_ply];
+int history_moves[12][64];
 
 // pv length
-int pv_length[246];
-int pv_table[246][246];
+int pv_length[max_ply];
+int pv_table[max_ply][max_ply];
 
 // half move counter
 int ply;
@@ -1561,6 +1563,11 @@ static inline int negamax(int alpha, int beta, int depth) {
         return quiescence(alpha, beta);
     }
 
+    // we are too deep, theres an overflow on ply
+    if (ply > max_ply - 1) {
+        return evaluate();
+    }
+
     nodes++;
 
     // check if opponent is in check
@@ -1641,17 +1648,29 @@ static inline int negamax(int alpha, int beta, int depth) {
 
 // search for best move
 void search_position(int depth) {
-
+    
+    int score = 0;
     nodes = 0;
-    int score = negamax(-50000, 50000, depth);
-    printf("info score cp %d depth %d nodes %ld pv ", score, depth, nodes);
+    
+    memset(killer_moves, 0, sizeof(killer_moves));
+    memset(history_moves, 0, sizeof(history_moves));
+    memset(pv_length, 0, sizeof(pv_length));
+    memset(pv_table, 0, sizeof(pv_table));
 
-    for (int count=0; count < pv_length[0]; count++) {
-        print_move(pv_table[0][count]);
-        printf("  ");
+    for (int current_depth = 1; current_depth <= depth; current_depth++) {
+
+        nodes = 0;
+
+        score = negamax(-50000, 50000, current_depth);
+        printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
+
+        for (int count=0; count < pv_length[0]; count++) {
+            print_move(pv_table[0][count]);
+            printf("  ");
+        }
+        printf("\n");
     }
 
-    printf("\n");
     // best move placeholders
     printf("bestmove ");
     print_move(pv_table[0][0]);
@@ -1827,13 +1846,13 @@ int main() {
     // init all
     init_all();
     
-    int debug = 0;
+    int debug = 1;
 
     if (debug) {
         // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
         parse_fen(tricky_position);
         print_board();
-        search_position(5); 
+        search_position(6); 
     } else {
         uci_loop();
     }
