@@ -1421,6 +1421,14 @@ static int mvv_lva[12][12] = {
 	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
 };
 
+// like the stockfishes
+int killer_moves[2][246];
+int history_moves[12][246];
+
+// pv length
+int pv_length[246];
+int pv_table[246][246];
+
 // half move counter
 int ply;
 
@@ -1444,17 +1452,18 @@ static inline int score_move(int move) {
                 break;
             }
         }
-
-        // print_move(move);
-        // printf("\n");
-
-        // printf("source piece %c\n", ascii_pieces[get_move_piece(move)]);
-        // printf("target piece %c", ascii_pieces[target_piece]);
-        // source, target
-        return mvv_lva[get_move_piece(move)][target_piece];
+        return mvv_lva[get_move_piece(move)][target_piece] + 10000;
     } else {
-        return 0;
+        // score 1st, 2d killer move
+        if (killer_moves[0][ply] == move)
+            return 9000;
+        // score history move
+        else if (killer_moves[1][ply] == move)
+            return 8000;
+        else 
+            return history_moves[get_move_piece(move)][get_move_target(move)];
     }
+    return 0;
 }
 
 void print_move_scores(moves moves) {
@@ -1545,6 +1554,9 @@ static inline int quiescence(int alpha, int beta) {
 
 static inline int negamax(int alpha, int beta, int depth) {
 
+    // init pv length
+    pv_length[ply] = ply;
+
     if (depth == 0) { 
         return quiescence(alpha, beta);
     }
@@ -1557,11 +1569,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     if (in_check) depth++;
 
     int legal_moves = 0;
-    int best_sofar;
-
-    // old alpha value
-    int old_alpha = alpha;
-
+ 
     moves moves;
 
     generate_moves(&moves);
@@ -1587,20 +1595,32 @@ static inline int negamax(int alpha, int beta, int depth) {
         take_back()
         // fail-hard beta cutoff
         if (score >= beta) {
+            if (!get_move_capture(moves.moves[count]))  {
+                // remember two moves
+                killer_moves[1][ply] = killer_moves[0][ply];
+                killer_moves[0][ply] = moves.moves[count];
+            }
             // move fails high
             return beta;
-        } 
+        }
 
         // found a better move
         if (score > alpha) {
+
+            if (!get_move_capture(moves.moves[count]))  {
+                history_moves[get_move_piece(moves.moves[count])][get_move_target(moves.moves[count])] += depth;
+            }
             alpha = score;
 
-            // if root move;
+            pv_table[ply][ply] = moves.moves[count];
 
-            if (ply == 0) {
-                // best move has best score
-                best_sofar = moves.moves[count];
+            for (int next_ply = ply+1; next_ply < pv_length[ply+1]; next_ply++) {
+                // copy move from deepetr ply into current plys line
+                pv_table[ply][next_ply] = pv_table[ply+1][next_ply];
             }
+
+            // adjust pv length
+            pv_length[ply] = pv_length[ply+1];
         }
     }
 
@@ -1615,10 +1635,6 @@ static inline int negamax(int alpha, int beta, int depth) {
         }
     }
 
-    if (old_alpha != alpha) {
-        best_move = best_sofar;
-    }
-
     // when move fails low
     return alpha;
 }
@@ -1628,13 +1644,18 @@ void search_position(int depth) {
 
     nodes = 0;
     int score = negamax(-50000, 50000, depth);
-    if (best_move) {
-        printf("info score cp %d depth %d nodes %ld\n", score, depth, nodes);
-        // best move placeholders
-        printf("bestmove ");
-        print_move(best_move);
-        printf("\n");
+    printf("info score cp %d depth %d nodes %ld pv ", score, depth, nodes);
+
+    for (int count=0; count < pv_length[0]; count++) {
+        print_move(pv_table[0][count]);
+        printf("  ");
     }
+
+    printf("\n");
+    // best move placeholders
+    printf("bestmove ");
+    print_move(pv_table[0][0]);
+    printf("\n");
 }
 
 
@@ -1806,22 +1827,13 @@ int main() {
     // init all
     init_all();
     
-    int debug = 1;
+    int debug = 0;
 
     if (debug) {
         // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
         parse_fen(tricky_position);
         print_board();
         search_position(5); 
-        // moves moves;
-        // generate_moves(&moves);
-
-        // print_move_scores(moves);
-
-        // sort_moves(&moves);
-
-        // print_move_scores(moves);
-
     } else {
         uci_loop();
     }
