@@ -1615,6 +1615,20 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     int legal_moves = 0;
  
+    // null move pruning
+    if (depth >= 3 && !in_check && ply) {
+        copy_board();
+        side ^= 1;
+        enpassant = no_sq;
+
+        int score = -negamax(-beta, -beta + 1, depth - 3);
+
+        take_back();
+
+        if (score >= beta) 
+            return beta;
+    }
+
     moves moves;
 
     generate_moves(&moves);
@@ -1642,6 +1656,7 @@ static inline int negamax(int alpha, int beta, int depth) {
 
         int score;
 
+        // PVS & LMR
         if (found_pv) {
             score = -negamax(-alpha - 1, - alpha, depth - 1);
 
@@ -1738,10 +1753,23 @@ void search_position(int depth) {
     memset(pv_length, 0, sizeof(pv_length));
     memset(pv_table, 0, sizeof(pv_table));
 
+    int alpha = -50000;
+    int beta = 50000;
+
     for (int current_depth = 1; current_depth <= depth; current_depth++) {
         follow_pv = 1;
 
-        score = negamax(-50000, 50000, current_depth);
+        score = negamax(alpha, beta, current_depth);
+
+        if (score <= alpha || score >= beta) {
+            alpha = -50000;
+            beta = 50000;
+            continue;
+        }
+        alpha = score - 50;
+        beta = score + 50;
+
+
         printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
 
         for (int count=0; count < pv_length[0]; count++) {
@@ -1926,7 +1954,7 @@ int main() {
     // init all
     init_all();
     
-    int debug = 1;
+    int debug = 0;
 
     if (debug) {
         // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
