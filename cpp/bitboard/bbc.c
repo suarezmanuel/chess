@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #ifdef WIN64
     #include <windows.h>
 #else
@@ -232,6 +233,21 @@ int side = white;
 int enpassant = no_sq;
 
 int castle = -1;
+
+
+
+int quit = 0;
+int movestogo = 30;
+int movetime = -1;
+int time = -1;
+int inc = 0;
+int starttime = 0;
+int stoptime = 0;
+int timeset = 0;
+int stopped = 0;
+
+
+
 
 
 
@@ -1210,6 +1226,108 @@ long long int get_time_ms() {
     #endif
 }
 
+int input_waiting() {
+    #ifndef WIN32
+        fd_set readfds;
+        struct timeval tv;
+        FD_ZERO (&readfds);
+        FD_SET (fileno(stdin), &readfds);
+        tv.tv_sec=0; tv.tv_usec=0;
+        select(16, &readfds, 0, 0, &tv);
+
+        return (FD_ISSET(fileno(stdin), &readfds));
+    #else
+        static int init = 0, pipe;
+        static HANDLE inh;
+        DWORD dw;
+
+        if (!init)
+        {
+            init = 1;
+            inh = GetStdHandle(STD_INPUT_HANDLE);
+            pipe = !GetConsoleMode(inh, &dw);
+            if (!pipe)
+            {
+                SetConsoleMode(inh, dw & ~(ENABLE_MOUSE_INPUT|ENABLE_WINDOW_INPUT));
+                FlushConsoleInputBuffer(inh);
+            }
+        }
+        
+        if (pipe)
+        {
+           if (!PeekNamedPipe(inh, NULL, 0, NULL, &dw, NULL)) return 1;
+           return dw;
+        }
+        
+        else
+        {
+           GetNumberOfConsoleInputEvents(inh, &dw);
+           return dw <= 1 ? 0 : dw;
+        }
+
+    #endif
+}
+
+void read_input() {
+    // bytes to read holder
+    int bytes;
+    
+    // GUI/user input
+    char input[256] = "", *endc;
+
+    // "listen" to STDIN
+    if (input_waiting())
+    {
+        // tell engine to stop calculating
+        stopped = 1;
+        
+        // loop to read bytes from STDIN
+        do
+        {
+            // read bytes from STDIN
+            bytes=read(fileno(stdin), input, 256);
+        }
+        
+        // until bytes available
+        while (bytes < 0);
+        
+        // searches for the first occurrence of '\n'
+        endc = strchr(input,'\n');
+        
+        // if found new line set value at pointer to 0
+        if (endc) *endc=0;
+        
+        // if input is available
+        if (strlen(input) > 0)
+        {
+            // match UCI "quit" command
+            if (!strncmp(input, "quit", 4))
+            {
+                // tell engine to terminate exacution    
+                quit = 1;
+            }
+
+            // // match UCI "stop" command
+            else if (!strncmp(input, "stop", 4))    {
+                // tell engine to terminate exacution
+                quit = 1;
+            }
+        }   
+    }
+}
+
+// a bridge function to interact between search and GUI input
+static void communicate() {
+	// if time is up break here
+    if(timeset == 1 && get_time_ms() > stoptime) {
+		// tell engine to stop calculating
+		stopped = 1;
+	}
+	
+    // read GUI input
+	read_input();
+}
+
 long nodes = 0;
 long local_nodes = 0;
 
@@ -1539,6 +1657,9 @@ static inline int sort_moves(moves* moves) {
 }
 
 static inline int quiescence(int alpha, int beta) {
+    if (nodes & 2047 == 0)
+        communicate();
+
     nodes++;    
 
     int eval = evaluate();
@@ -1592,7 +1713,8 @@ const int full_depth_moves = 4;
 const int reduction_limit = 3;
 
 static inline int negamax(int alpha, int beta, int depth) {
-    int found_pv = 0;
+    if (nodes & 2047 == 0)
+        communicate();
 
     // init pv length
     pv_length[ply] = ply;
@@ -1624,6 +1746,8 @@ static inline int negamax(int alpha, int beta, int depth) {
         int score = -negamax(-beta, -beta + 1, depth - 3);
 
         take_back();
+
+        if(stopped == 1) return 0;
 
         if (score >= beta) 
             return beta;
@@ -1657,36 +1781,27 @@ static inline int negamax(int alpha, int beta, int depth) {
         int score;
 
         // PVS & LMR
-        if (found_pv) {
-            score = -negamax(-alpha - 1, - alpha, depth - 1);
-
-            if (score > alpha && score < beta) {
-                // if failed to be proven bad
-                score = -negamax(-beta, -alpha, depth - 1);
-            }
+        if (moves_searched == 0) {
+            score = -negamax(-beta, -alpha, depth-1);
         } else {
-            if (moves_searched == 0) {
-                score = -negamax(-beta, -alpha, depth-1);
+            if (moves_searched >= full_depth_moves &&
+                depth >= reduction_limit && 
+                !in_check && 
+                !get_move_capture(moves.moves[count]) &&
+                !get_move_promoted(moves.moves[count])) {
+                score = -negamax(-alpha - 1, -alpha, depth - 2);
             } else {
-                if (moves_searched >= full_depth_moves &&
-                    depth >= reduction_limit && 
-                    !in_check && 
-                    !get_move_capture(moves.moves[count]) &&
-                    !get_move_promoted(moves.moves[count])) {
-                    score = -negamax(-alpha - 1, -alpha, depth - 2);
-                } else {
-                    score = alpha + 1;
-                }
+                score = alpha + 1;
+            }
 
-                if (score > alpha) {
-                    score = -negamax(-alpha - 1, -alpha, depth - 1);
-                    if (score > alpha && score < beta) {
-                        score = -negamax(-beta, -alpha, depth - 1);
-                    }
+            if (score > alpha) {
+                score = -negamax(-alpha - 1, -alpha, depth - 1);
+                if (score > alpha && score < beta) {
+                    score = -negamax(-beta, -alpha, depth - 1);
                 }
             }
         }
-
+        
         ply--;
         take_back()
 
@@ -1710,8 +1825,6 @@ static inline int negamax(int alpha, int beta, int depth) {
                 history_moves[get_move_piece(moves.moves[count])][get_move_target(moves.moves[count])] += depth;
             }
             alpha = score;
-
-            found_pv = 1;
 
             pv_table[ply][ply] = moves.moves[count];
 
@@ -1745,6 +1858,7 @@ void search_position(int depth) {
     
     int score = 0;
     nodes = 0;
+    stopped = 0;
     follow_pv = 0;
     score_pv = 0;
     
@@ -1757,6 +1871,10 @@ void search_position(int depth) {
     int beta = 50000;
 
     for (int current_depth = 1; current_depth <= depth; current_depth++) {
+        if (stopped)
+            break;
+
+
         follow_pv = 1;
 
         score = negamax(alpha, beta, current_depth);
@@ -1768,7 +1886,6 @@ void search_position(int depth) {
         }
         alpha = score - 50;
         beta = score + 50;
-
 
         printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
 
@@ -1784,9 +1901,6 @@ void search_position(int depth) {
     print_move(pv_table[0][0]);
     printf("\n");
 }
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int parse_move(char* move_string) {
 
@@ -1879,24 +1993,90 @@ void parse_position(char *command) {
 }
 
 void parse_go(char *command) {
+    // init parameters
     int depth = -1;
 
-    char* current_depth = NULL;
+    // init argument
+    char *argument = NULL;
 
-    if (current_depth = strstr(command, "depth")) {
-        // depth is 5 chars long
-        depth = atoi(current_depth + 6);
-        search_position(depth);
-    } else if (current_depth = strstr(command, "perft")) {
-        depth = atoi(current_depth + 6);
-        perft_test(depth);
-    } else {
-        // time controls placeholder
-        search_position(2);
-    } 
-    // printf("depth: %d\n", depth); 
+    // infinite search
+    if ((argument = strstr(command,"infinite"))) {}
+
+    // match UCI "binc" command
+    if ((argument = strstr(command,"binc")) && side == black)
+        // parse black time increment
+        inc = atoi(argument + 5);
+
+    // match UCI "winc" command
+    if ((argument = strstr(command,"winc")) && side == white)
+        // parse white time increment
+        inc = atoi(argument + 5);
+
+    // match UCI "wtime" command
+    if ((argument = strstr(command,"wtime")) && side == white)
+        // parse white time limit
+        time = atoi(argument + 6);
+
+    // match UCI "btime" command
+    if ((argument = strstr(command,"btime")) && side == black)
+        // parse black time limit
+        time = atoi(argument + 6);
+
+    // match UCI "movestogo" command
+    if ((argument = strstr(command,"movestogo")))
+        // parse number of moves to go
+        movestogo = atoi(argument + 10);
+
+    // match UCI "movetime" command
+    if ((argument = strstr(command,"movetime")))
+        // parse amount of time allowed to spend to make a move
+        movetime = atoi(argument + 9);
+
+    // match UCI "depth" command
+    if ((argument = strstr(command,"depth")))
+        // parse search depth
+        depth = atoi(argument + 6);
+
+    // if move time is not available
+    if(movetime != -1)
+    {
+        // set time equal to move time
+        time = movetime;
+
+        // set moves to go to 1
+        movestogo = 1;
+    }
+
+    // init start time
+    starttime = get_time_ms();
+
+    // init search depth
+    depth = depth;
+
+    // if time control is available
+    if(time != -1)
+    {
+        // flag we're playing with time control
+        timeset = 1;
+
+        // set up timing
+        time /= movestogo;
+        time -= 50;
+        stoptime = starttime + time + inc;
+    }
+
+    // if depth is not available
+    if(depth == -1)
+        // set depth to 64 plies (takes ages to complete...)
+        depth = 64;
+
+    // print debug info
+    printf("time:%d start:%d stop:%d depth:%d timeset:%d\n",
+    time, starttime, stoptime, depth, timeset);
+
+    // search position
+    search_position(depth);
 }
-
 void uci_loop() {
     // reset stdin, stdout
     setbuf(stdin, NULL);
@@ -1960,7 +2140,7 @@ int main() {
         // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
         parse_fen(tricky_position);
         print_board();
-        search_position(7); 
+        search_position(10); 
     } else {
         uci_loop();
     }
