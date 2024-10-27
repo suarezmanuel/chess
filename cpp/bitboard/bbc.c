@@ -1097,7 +1097,7 @@ static inline void generate_moves(moves* move_list) {
                 while (attacks) {
                     target_square = get_lsb1_index(attacks);
 
-                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+                    if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_square)) {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 0, 0, 0, 0)); 
                     } else {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0)); 
@@ -1119,7 +1119,7 @@ static inline void generate_moves(moves* move_list) {
                 while (attacks) {
                     target_square = get_lsb1_index(attacks);
 
-                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+                    if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_square)) {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 0, 0, 0, 0)); 
                     } else {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0)); 
@@ -1141,7 +1141,7 @@ static inline void generate_moves(moves* move_list) {
                 while (attacks) {
                     target_square = get_lsb1_index(attacks);
 
-                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+                    if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_square)) {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 0, 0, 0, 0)); 
                     } else {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0)); 
@@ -1163,7 +1163,7 @@ static inline void generate_moves(moves* move_list) {
                 while (attacks) {
                     target_square = get_lsb1_index(attacks);
 
-                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+                    if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_square)) {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 0, 0, 0, 0)); 
                     } else {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0)); 
@@ -1185,7 +1185,7 @@ static inline void generate_moves(moves* move_list) {
                 while (attacks) {
                     target_square = get_lsb1_index(attacks);
 
-                    if (!get_bit(side == white ? occupancies[black] : occupancies[white], target_square)) {
+                    if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_square)) {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 0, 0, 0, 0)); 
                     } else {
                         add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0)); 
@@ -1200,8 +1200,7 @@ static inline void generate_moves(moves* move_list) {
     }
 }
 
-long long int get_time_ms()
-{
+long long int get_time_ms() {
     #ifdef WIN64
         return GetTickCount();
     #else
@@ -1292,8 +1291,7 @@ int material_score[12] = {
     -10000,
 };
 
-const int pawn_score[64] = 
-{
+const int pawn_score[64] = {
     90,  90,  90,  90,  90,  90,  90,  90,
     30,  30,  30,  40,  40,  30,  30,  30,
     20,  20,  20,  30,  30,  30,  20,  20,
@@ -1305,8 +1303,7 @@ const int pawn_score[64] =
 };
 
 // knight positional score
-const int knight_score[64] = 
-{
+const int knight_score[64] = {
     -5,   0,   0,   0,   0,   0,   0,  -5,
     -5,   0,   0,  10,  10,   0,   0,  -5,
     -5,   5,  20,  20,  20,  20,   5,  -5,
@@ -1318,8 +1315,7 @@ const int knight_score[64] =
 };
 
 // bishop positional score
-const int bishop_score[64] = 
-{
+const int bishop_score[64] = {
      0,   0,   0,   0,   0,   0,   0,   0,
      0,   0,   0,   0,   0,   0,   0,   0,
      0,   0,   0,  10,  10,   0,   0,   0,
@@ -1332,8 +1328,7 @@ const int bishop_score[64] =
 };
 
 // rook positional score
-const int rook_score[64] =
-{
+const int rook_score[64] ={
     50,  50,  50,  50,  50,  50,  50,  50,
     50,  50,  50,  50,  50,  50,  50,  50,
      0,   0,  10,  20,  20,  10,   0,   0,
@@ -1346,8 +1341,7 @@ const int rook_score[64] =
 };
 
 // king positional score
-const int king_score[64] = 
-{
+const int king_score[64] = {
      0,   0,   0,   0,   0,   0,   0,   0,
      0,   0,   5,   5,   5,   5,   0,   0,
      0,   5,   5,  10,  10,   5,   5,   0,
@@ -1359,8 +1353,7 @@ const int king_score[64] =
 };
 
 // mirror for opponent
-const int mirror_score[128] =
-{
+const int mirror_score[128] ={
 	a1, b1, c1, d1, e1, f1, g1, h1,
 	a2, b2, c2, d2, e2, f2, g2, h2,
 	a3, b3, c3, d3, e3, f3, g3, h3,
@@ -1412,21 +1405,157 @@ static inline int evaluate() {
     return (side == white) ? score : -score;
 }
 
+static int mvv_lva[12][12] = {
+ 	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600,
+
+	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
+};
+
 // half move counter
 int ply;
 
 int best_move;
 
+// get the score of the function based on whos eating what
+static inline int score_move(int move) {
+    if (get_move_capture(move)) {
+        int target_piece = P;
+
+        int start_piece, end_piece;
+
+        // go over your color's pieces
+        if (side == white) { start_piece = p; end_piece =  k; } 
+        else { start_piece = P; end_piece = K; }
+
+        for (int pp = start_piece; pp <= end_piece; pp++) {
+            // get the piece on the target
+            if (get_bit(bitboards[pp], get_move_target(move))) {
+                target_piece = pp;
+                break;
+            }
+        }
+
+        // print_move(move);
+        // printf("\n");
+
+        // printf("source piece %c\n", ascii_pieces[get_move_piece(move)]);
+        // printf("target piece %c", ascii_pieces[target_piece]);
+        // source, target
+        return mvv_lva[get_move_piece(move)][target_piece];
+    } else {
+        return 0;
+    }
+}
+
+void print_move_scores(moves moves) {
+    
+     printf("     move scores:\n\n");
+    
+    for (int i = 0; i < moves.count; i++) {
+        // print_move(moves.moves[i]);
+        printf("     move: ");
+        print_move(moves.moves[i]);
+        printf("     score: %d\n", score_move(moves.moves[i]));
+    }
+}
+
+static inline int sort_moves(moves* moves) {
+    int move_scores[moves->count];
+
+    // fill array based on scores
+    for (int i = 0; i < moves->count; i++) {
+        move_scores[i] = score_move(moves->moves[i]);
+    }
+
+    // 
+    for (int i = 0; i < moves->count; i++) {
+        for (int j = i+1; j < moves->count; j++) {
+            if (move_scores[i] < move_scores[j]) {
+                int temp_score = move_scores[i];
+                move_scores[i] = move_scores[j];
+                move_scores[j] = temp_score;
+
+                int temp_move = moves->moves[i];
+                moves->moves[i] = moves->moves[j];
+                moves->moves[j] = temp_move;
+            }
+        }
+    }
+}
+
+static inline int quiescence(int alpha, int beta) {
+    nodes++;    
+
+    int eval = evaluate();
+    // fail-hard beta cutoff
+    if (eval >= beta) {
+        // move fails high
+        return beta;
+    } 
+
+    // found a better move
+    if (eval > alpha) {
+        alpha = eval;
+    }
+
+    moves moves;
+
+    generate_moves(&moves);
+
+    sort_moves(&moves);
+
+    for (int count = 0; count < moves.count; count++) {
+        copy_board();
+
+        ply++;
+
+        if (make_move(moves.moves[count], only_captures) == 0) {
+            // if make move is illegal
+            ply--;
+            continue;
+        }
+
+        int score = -quiescence(-beta, -alpha);
+
+        ply--;
+        take_back()
+        // fail-hard beta cutoff
+        if (score >= beta) {
+            // move fails high
+            return beta;
+        } 
+
+        // found a better move
+        if (score > alpha) {
+            alpha = score;
+        }
+    }
+    return alpha;
+}
+
 static inline int negamax(int alpha, int beta, int depth) {
 
-    if (depth == 0) {
-        return evaluate();
+    if (depth == 0) { 
+        return quiescence(alpha, beta);
     }
 
     nodes++;
 
     // check if opponent is in check
     int in_check = is_square_attacked((side==white) ? get_lsb1_index(bitboards[K]) : get_lsb1_index(bitboards[k]), side ^ 1);
+    // search deeper if in check
+    if (in_check) depth++;
+
     int legal_moves = 0;
     int best_sofar;
 
@@ -1437,7 +1566,7 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     generate_moves(&moves);
 
-    // for (int i=0; i < moves.count; i++) { print_move(moves.moves[i]); printf("\n"); }
+    sort_moves(&moves);
 
     for (int count = 0; count < moves.count; count++) {
         copy_board();
@@ -1455,8 +1584,7 @@ static inline int negamax(int alpha, int beta, int depth) {
         int score = -negamax(-beta, -alpha, depth-1);
 
         ply--;
-        take_back();
-
+        take_back()
         // fail-hard beta cutoff
         if (score >= beta) {
             // move fails high
@@ -1467,17 +1595,13 @@ static inline int negamax(int alpha, int beta, int depth) {
         if (score > alpha) {
             alpha = score;
 
-            // if root move
+            // if root move;
+
             if (ply == 0) {
                 // best move has best score
                 best_sofar = moves.moves[count];
             }
         }
-
-        if (old_alpha != alpha) {
-            best_move = best_sofar;
-        }
-
     }
 
     if (legal_moves == 0) {
@@ -1491,115 +1615,12 @@ static inline int negamax(int alpha, int beta, int depth) {
         }
     }
 
+    if (old_alpha != alpha) {
+        best_move = best_sofar;
+    }
+
     // when move fails low
     return alpha;
-}
-
-#define MAX_DEPTH 10
-#define SAMPLING_COUNT 50
-
-long long int depth_nodes = 0;
-long long int branches_not_taken [MAX_DEPTH];
-long long int sum_branching_factors [MAX_DEPTH];
-long long int perft_startpos_results [MAX_DEPTH] = {20, 400, 8902, 197281,  4865609, 119060324,  3195901860, 84998978956, 2439530234167, 69352859712417};
-
-static inline int negamax_record(int alpha, int beta, int depth, int initial_depth, int count_branches) {
-
-    if (depth == 0) {
-        depth_nodes++;
-        return evaluate();
-    }
-
-    nodes++;
-
-    // check if opponent is in check
-    int in_check = is_square_attacked((side==white) ? get_lsb1_index(bitboards[K]) : get_lsb1_index(bitboards[k]), side ^ 1);
-    int legal_moves = 0;
-    int best_sofar;
-
-    // old alpha value
-    int old_alpha = alpha;
-
-    moves moves;
-
-    generate_moves(&moves);
-
-    if (count_branches) {
-        sum_branching_factors[initial_depth-depth] += moves.count;
-    }
-
-    for (int count = 0; count < moves.count; count++) {
-        copy_board();
-
-        ply++;
-
-        if (make_move(moves.moves[count], all_moves) == 0) {
-            ply--;
-            continue;
-        }
-
-        legal_moves++;
-
-        int score = -negamax_record(-beta, -alpha, depth-1, initial_depth, count_branches);
-
-        ply--;
-        take_back();
-
-        if (score >= beta) {
-            if (count_branches) {
-                branches_not_taken[initial_depth-depth]++;
-            }
-            return beta;
-        } 
-
-        if (score > alpha) {
-            alpha = score;
-
-            if (ply == 0) {
-                best_sofar = moves.moves[count];
-            }
-        }
-
-        if (old_alpha != alpha) {
-            best_move = best_sofar;
-        }
-    }
-
-    if (legal_moves == 0) {
-
-        if (in_check) {
-            return -49000 + ply;
-        } else {
-            return 0;
-        }
-    }
-
-    return alpha;
-}
-
-void record (int depth) {
-
-    FILE* fp = fopen("./records/data.txt", "w");
-    if (fp == NULL) {
-        printf("error opening data.txt");
-        return;
-    }
-
-    for (int i=1; i <= min(MAX_DEPTH, depth); i++){
-        depth_nodes = 0;
-        negamax_record(-50000, 50000, i, i, i == min(MAX_DEPTH, depth));
-        printf("node count at depth %d: %lld\n", i, depth_nodes);
-    }
-
-    printf("\n");
-    // the printing values of depth_nodes, branch_factors is different because branch_factors is cummulative
-    for (int i=0; i < min(MAX_DEPTH, depth); i++) {
-        printf("branches not taken at depth %d: %lld\n", i+1, branches_not_taken[i]);
-        printf("nodes with cutting: %lld, nodes without cutting: %lld, percentage saved: %lld%%\n\n", sum_branching_factors[i], perft_startpos_results[i], 100*(perft_startpos_results[i]-sum_branching_factors[i])/sum_branching_factors[i]);
-        fprintf(fp, "%d %lld %lld\n", i+1, sum_branching_factors[i], perft_startpos_results[i]);
-    }
-
-    fclose(fp);
 }
 
 // search for best move
@@ -1615,6 +1636,9 @@ void search_position(int depth) {
         printf("\n");
     }
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int parse_move(char* move_string) {
 
@@ -1778,21 +1802,26 @@ void uci_loop() {
     }
 }
 
-int main()
-{
+int main() {
     // init all
     init_all();
     
     int debug = 1;
 
     if (debug) {
-        parse_fen(start_position);
-        record(6);
-        // long long int start = get_time_ms();
-        // negamax(-50000, 50000, 6);
-        // printf("time taken: %lld", get_time_ms()-start);
-        // print_board();
-        // search_position(2);
+        // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
+        parse_fen(tricky_position);
+        print_board();
+        search_position(5); 
+        // moves moves;
+        // generate_moves(&moves);
+
+        // print_move_scores(moves);
+
+        // sort_moves(&moves);
+
+        // print_move_scores(moves);
+
     } else {
         uci_loop();
     }
