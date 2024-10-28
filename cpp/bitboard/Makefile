@@ -1,6 +1,6 @@
 all:
 	gcc -Ofast bbc.c -o ./bin/bbc
-	x86_64-w64-mingw32-gcc -Ofast bbc.c -o ./bin/bbc.exe
+	x86_64-w64-mingw32-gcc -Ofast -O3 bbc.c -o ./bin/bbc.exe
 	./bin/bbc
 debug:
 	gcc bbc.c -o ./bin/bbc

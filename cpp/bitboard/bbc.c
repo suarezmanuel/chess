@@ -234,7 +234,8 @@ int enpassant = no_sq;
 
 int castle = -1;
 
-
+// almost unique position identifier aka position key
+U64 hash_key = 0ULL;
 
 int quit = 0;
 int movestogo = 30;
@@ -582,6 +583,43 @@ void print_bitboard(U64 board) {
     printf("\n    Bitboard: %llud\n\n", board);
 }
 
+// hash pieces, en passant, castling rights
+// piece, square
+U64 piece_keys[12][64];
+U64 enpassant_keys[64];
+U64 castle_keys[16];
+U64 side_key;
+
+U64 generate_hash_key() {
+    U64 final_key = 0ULL;
+
+    U64 bitboard;    
+    for (int pp = P; pp <= k; pp++) {
+        bitboard = bitboards[pp];
+
+        while(bitboard) {
+            int square = get_lsb1_index(bitboard);
+            
+            final_key ^= piece_keys[pp][square];
+            
+            pop_bit(bitboard, square);
+        }
+    }
+
+    if (enpassant != no_sq) {
+        // hash enpassant
+        final_key ^= enpassant_keys[enpassant];
+    }
+    
+    final_key ^= castle_keys[castle];
+
+    if (side == black) {
+        final_key ^= side_key;
+    }
+    
+    return final_key;
+}
+
 // arguments are global
 void print_board() {
     for (int rank = 0; rank < 8; rank++) {
@@ -611,8 +649,8 @@ void print_board() {
     printf("\n     a b c d e f g h \n\n");
     printf("     Side:    %s\n", !side ? "white" : "black");
     printf("     Enpassant: %s\n", enpassant != no_sq ? square_to_coordinates[enpassant] : "no");
-    printf("     Castling: %c%c%c%c\n\n", castle & wk ? 'K' : '-', castle & wq ? 'Q' : '-', castle & bk ? 'k' : '-', castle & bq ? 'q' : '-');
-    
+    printf("     Castling: %c%c%c%c\n", castle & wk ? 'K' : '-', castle & wq ? 'Q' : '-', castle & bk ? 'k' : '-', castle & bq ? 'q' : '-');
+    printf("     Hash key: %llx\n\n", hash_key);
 }
 
 void parse_fen(char* fen) {
@@ -692,6 +730,8 @@ void parse_fen(char* fen) {
     }
 
     occupancies[both] = occupancies[white] | occupancies[black];
+
+    hash_key = generate_hash_key();
 }
 
 U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask) {
@@ -783,12 +823,6 @@ static inline U64 get_queen_attacks(int square, U64 occupancy) {
     return queen_attacks;
 }
 
-void init_all() {
-    init_leapers_attacks();
-    init_sliders_attacks(bishop);
-    init_sliders_attacks(rook);
-}
-
 static inline int is_square_attacked(int square, int side) {
     if (side == white && (pawn_attacks[black][square] & bitboards[P])) return 1;
     if (side == black && (pawn_attacks[white][square] & bitboards[p])) return 1;
@@ -827,11 +861,13 @@ void print_attacked_squares(int side) {
     memcpy(bitboards_copy, bitboards, 96);                                 \
     memcpy(occupancies_copy, occupancies, 24);                             \
     side_copy = side, enpassant_copy = enpassant, castle_copy = castle;    \
+    U64 hash_key_copy = hash_key;                                          \
 
 #define take_back()                                                        \
     memcpy(bitboards, bitboards_copy, 96);                                 \
     memcpy(occupancies, occupancies_copy, 24);                             \
     side = side_copy, enpassant = enpassant_copy, castle = castle_copy;    \
+    hash_key = hash_key_copy                                               \
 
 
 // move types
@@ -868,6 +904,8 @@ static inline int make_move(int move, int move_flag) {
         pop_bit(bitboards[piece], source_square);
         set_bit(bitboards[piece], target_square);
 
+        hash_key ^= piece_keys[piece][source_square];
+        hash_key ^= piece_keys[piece][target_square];
 
         if (capture) {
             int start_piece, end_piece;
@@ -883,6 +921,9 @@ static inline int make_move(int move, int move_flag) {
             for (int pp = start_piece; pp <= end_piece; pp++) {
                 if (get_bit(bitboards[pp], target_square)) {
                     pop_bit(bitboards[pp], target_square);
+                    
+                    hash_key ^= piece_keys[pp][target_square];
+                    
                     break;
                 }
 
@@ -890,18 +931,48 @@ static inline int make_move(int move, int move_flag) {
         }
 
         if (promoted) {
-            pop_bit(bitboards[side == white ? P : p], target_square);
+            //pop_bit(bitboards[side == white ? P : p], target_square);
+
+            if (side == white) {
+                pop_bit(bitboards[P], target_square);
+                hash_key ^= piece_keys[P][target_square];
+            } else {
+                pop_bit(bitboards[p], target_square);
+                hash_key ^= piece_keys[p][target_square];
+            }
             set_bit(bitboards[promoted], target_square);
+
+            // add promoted piece to hash key
+            hash_key ^= piece_keys[promoted][target_square];
         }
 
-        int tt = target_square + (-(side == black) + (side == white))*8;
         if (enpass) {
-            pop_bit(bitboards[side == white ? p : P], tt);
+            if (side == white) {
+                pop_bit(bitboards[p], target_square + 8);
+                hash_key ^= piece_keys[p][target_square + 8];
+            } else {
+                pop_bit(bitboards[P], target_square - 8);
+                hash_key ^= piece_keys[P][target_square - 8];
+            }
+        }
+
+
+        if (enpassant != no_sq) {
+            hash_key ^= enpassant_keys[enpassant];
         }
 
         enpassant = no_sq;
+
         if (double_push) {
-            enpassant = tt;
+            //enpassant = tt;
+
+           
+            if (side == white) {
+                enpassant = target_square + 8;
+            } else {
+                enpassant = target_square - 8;
+            }
+            hash_key ^= enpassant_keys[enpassant];
         }
 
         if (castling) {
@@ -909,24 +980,41 @@ static inline int make_move(int move, int move_flag) {
                 case g1: 
                     pop_bit(bitboards[R], h1);
                     set_bit(bitboards[R], f1);
+
+                    hash_key ^= piece_keys[R][h1];
+                    hash_key ^= piece_keys[R][f1];
                     break;
                 case c1:
                     pop_bit(bitboards[R], a1);
                     set_bit(bitboards[R], d1);
+
+                    hash_key ^= piece_keys[R][a1];
+                    hash_key ^= piece_keys[R][d1];
                     break;
                 case g8:
                     pop_bit(bitboards[r], h8);
                     set_bit(bitboards[r], f8);
+
+                    hash_key ^= piece_keys[r][h8];
+                    hash_key ^= piece_keys[r][f8];
                     break;
                 case c8:
                     pop_bit(bitboards[r], a8);
                     set_bit(bitboards[r], d8);
+
+                    hash_key ^= piece_keys[r][a8];
+                    hash_key ^= piece_keys[r][d8];
                     break;
             }
         }
 
+        // hash castling
+        hash_key ^= castle_keys[castle];
+
         castle &= castling_rights[source_square];
         castle &= castling_rights[target_square];
+
+        hash_key ^= castle_keys[castle];
 
         memset(occupancies, 0ULL, 24);
         for (int pp = P; pp <= K; pp++) {
@@ -938,6 +1026,18 @@ static inline int make_move(int move, int move_flag) {
         occupancies[both] = occupancies[white] | occupancies[black];
 
         side ^= 1;
+
+        hash_key ^= side_key;
+
+        // U64 hash_from_scratch = generate_hash_key();
+        // if (hash_key != hash_from_scratch) {
+        //     printf("\n\nMake move\n");
+        //     printf("move: ");
+        //     print_move(move);
+        //     print_board();
+        //     printf(" hash key should be %llx\n", hash_from_scratch);
+        //     getchar();
+        // }
 
         if (is_square_attacked(side == white ? get_lsb1_index(bitboards[k]) : get_lsb1_index(bitboards[K]), side)) {
             take_back();
@@ -1353,6 +1453,15 @@ static inline void perft_driver(int depth) {
         perft_driver(depth-1);
 
         take_back();
+
+        // U64 hash_from_scratch = generate_hash_key();
+        // if (hash_key != hash_from_scratch) {
+        //     printf("\n\nTake back\n");
+        //     printf("move: ");
+        //     print_move(moves.moves[i]);
+        //     printf(" hash key should be %llx\n", hash_from_scratch);
+        //     getchar();
+        // }
     }
 }
 
@@ -1363,7 +1472,7 @@ void perft_test(int depth) {
 
     generate_moves(&moves);
 
-    int start = get_time_ms();
+    long long int start = get_time_ms();
 
     for (int i=0; i < moves.count; i++) {
         
@@ -1554,7 +1663,71 @@ int follow_pv, score_pv;
 // half move counter
 int ply;
 
-int best_move;
+
+// hash table size
+#define hash_size 0x400000
+
+#define no_hash_entry 100000
+
+// transposition table hash flags
+#define hash_flag_exact 0
+#define hash_flag_alpha 1
+#define hash_flag_beta 2
+
+// transposition table data structure
+typedef struct {
+    U64 hash_key;   // "almost" unique chess position identifier
+    int depth;      // current search depth
+    int flag;       // flag the type of node (fail-low/fail-high/PV) 
+    int score;      // score (alpha/beta/PV)
+} tt;               // transposition table (TT aka hash table)
+
+// define TT instance
+tt hash_table[hash_size]; 
+
+void clear_hash_table() {
+    for (int i = 0; i < hash_size; i ++) {
+            hash_table[i].hash_key = 0;
+            hash_table[i].depth = 0;
+            hash_table[i].flag = 0;
+            hash_table[i].score = 0;
+    }
+}
+
+static inline int read_hash_entry(int alpha, int beta, int depth) {
+    tt *hash_entry = &hash_table[hash_key % hash_size];
+
+    if (hash_entry->hash_key == hash_key) {
+        if (hash_entry->depth >= depth) {
+            if (hash_entry->flag == hash_flag_exact) {
+                printf("exact score: ");
+                return hash_entry->score;
+            }
+            if (hash_entry->flag == hash_flag_alpha 
+            &&  hash_entry->score <= alpha) {
+                printf("alpha score: ");
+                return alpha;
+            }
+
+            if (hash_entry->flag == hash_flag_beta 
+            &&  hash_entry->score >= beta) {
+                printf("beta score: ");
+                return beta;
+            }
+        }
+    }
+    return no_hash_entry;
+}
+
+static inline int write_hash_entry(int score, int depth, int flag) {
+    tt *hash_entry = &hash_table[hash_key % hash_size];
+
+    hash_entry->hash_key = hash_key;
+    hash_entry->score = score;
+    hash_entry->flag = flag;
+    hash_entry->depth = depth;
+}
+
 
 static inline void enable_pv_scoring(moves* moves) {
     follow_pv = 0;    
@@ -1694,7 +1867,7 @@ static inline int quiescence(int alpha, int beta) {
         int score = -quiescence(-beta, -alpha);
 
         ply--;
-        take_back()
+        take_back();
         // fail-hard beta cutoff
         if (score >= beta) {
             // move fails high
@@ -1803,7 +1976,7 @@ static inline int negamax(int alpha, int beta, int depth) {
         }
         
         ply--;
-        take_back()
+        take_back();
 
         moves_searched++;
 
@@ -2130,17 +2303,140 @@ void uci_loop() {
     }
 }
 
+unsigned int state = 1804289383;
+
+// generate U32 number
+unsigned int get_random_U32_number() {
+
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+
+    return state;
+}
+
+U64 get_random_U64_number() {
+    U64 n1, n2, n3, n4;
+    // get bottom 16 bits of number
+    n1 = (U64)(get_random_U32_number() & 0xFFFF);
+    n2 = (U64)(get_random_U32_number() & 0xFFFF);
+    n3 = (U64)(get_random_U32_number() & 0xFFFF);
+    n4 = (U64)(get_random_U32_number() & 0xFFFF);
+
+    return n1 | (n2 << 16) | (n3 << 32) | (n4 << 48);
+}
+
+// generate magic number candidate
+U64 generate_magic_number() {
+    return get_random_U64_number() & get_random_U64_number() & get_random_U64_number();
+}
+
+U64 find_magic_number(int square, int relevant_bits, int bishop) {
+    U64 occupancies[4096];
+    U64 attacks[4096];
+    U64 used_attacks[4096];
+
+    U64 attack_mask = bishop ? mask_bishop_attacks(square) : mask_rook_attacks(square);
+
+    int occupancy_indicies = 1 << relevant_bits;
+    for (int i = 0; i < occupancy_indicies; i++) {
+        occupancies[i] = set_occupancy(i, relevant_bits, attack_mask);
+
+        attacks[i] = bishop ? bishop_attacks_on_the_fly(square, occupancies[i]) : rook_attacks_on_the_fly(square, occupancies[i]);
+    }
+
+    for (int random_count = 0; random_count < 100000000; random_count++) {
+        U64 magic_number = generate_magic_number();
+
+        if (count_bits((attack_mask * magic_number) & 0xFF00000000000000) < 6) continue;
+
+        memset(used_attacks, 0ULL, sizeof(used_attacks));
+
+        int i, fail;
+
+        for (i = 0, fail = 0; !fail && i < occupancy_indicies; i++) {
+            int magic_i = (int)((occupancies[i] * magic_number) >> (64 - relevant_bits));
+        
+            if (used_attacks[magic_i] == 0ULL) 
+                used_attacks[magic_i] = attacks[i];
+
+            else if (used_attacks[magic_i] != attacks[i])
+                fail = 1;
+        }
+
+        if (!fail)
+            return magic_number;
+    }
+
+    printf("Magic number fails!\n");
+    return 0ULL;
+}
+
+void init_magic_numbers() {
+    for (int square = 0; square < 64; square++) {
+        rook_magic_numbers[square] = find_magic_number(square, rook_relevant_bits[square], rook); 
+    }
+
+    for (int square = 0; square < 64; square++) {
+        bishop_magic_numbers[square] = find_magic_number(square, bishop_relevant_bits[square], bishop); 
+    }
+
+    // for (int square = 0; square < 64; square++) {
+    //     printf(" 0x%llxULL,\n", find_magic_number(square, rook_relevant_bits[square], rook)); 
+    // }
+    // printf("\n\n\n");
+
+    // for (int square = 0; square < 64; square++) {
+    //     printf(" 0x%llxULL,\n", find_magic_number(square, bishop_relevant_bits[square], bishop)); 
+    // }
+}
+
+void init_random_keys() {
+    
+    state = 1804289383;
+
+    for (int pp = P; pp <= k; pp++) {
+        for (int square = 0; square < 64; square++) {
+            piece_keys[pp][square] = get_random_U64_number();
+        }
+    } 
+
+    for (int square = 0; square < 64; square++) {
+        enpassant_keys[square] = get_random_U64_number();
+    }
+
+    for (int i = 0; i < 16; i++) {
+        castle_keys[i] = get_random_U64_number();
+    }   
+
+    side_key = get_random_U64_number();
+} 
+
+void init_all() {
+    init_leapers_attacks();
+    init_sliders_attacks(bishop);
+    init_sliders_attacks(rook);
+    init_random_keys();
+}
+
+
 int main() {
     // init all
     init_all();
     
-    int debug = 0;
+    int debug = 1;
 
     if (debug) {
-        // parse_fen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1 ");
-        parse_fen(tricky_position);
+        parse_fen(start_position);
         print_board();
-        search_position(10); 
+        clear_hash_table();
+
+        write_hash_entry(21, 1, hash_flag_alpha);
+
+        int score = read_hash_entry(20, 30, 1);
+
+        printf("%d\n", score);
+        //perft_test(6);
     } else {
         uci_loop();
     }
