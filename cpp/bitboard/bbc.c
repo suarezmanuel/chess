@@ -1632,6 +1632,10 @@ static inline int evaluate() {
     return (side == white) ? score : -score;
 }
 
+#define infinity 50000
+#define mate_value 49000
+#define mate_score 48000
+
 static int mvv_lva[12][12] = {
  	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
 	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
@@ -1699,19 +1703,22 @@ static inline int read_hash_entry(int alpha, int beta, int depth) {
 
     if (hash_entry->hash_key == hash_key) {
         if (hash_entry->depth >= depth) {
+
+            int score = hash_entry->score;
+
+            if (score < -mate_score) score += ply;
+            if (score > mate_score) score -= ply;
+
             if (hash_entry->flag == hash_flag_exact) {
-                printf("exact score: ");
-                return hash_entry->score;
+                return score;
             }
             if (hash_entry->flag == hash_flag_alpha 
-            &&  hash_entry->score <= alpha) {
-                printf("alpha score: ");
+            &&  score <= alpha) {
                 return alpha;
             }
 
             if (hash_entry->flag == hash_flag_beta 
-            &&  hash_entry->score >= beta) {
-                printf("beta score: ");
+            &&  score >= beta) {
                 return beta;
             }
         }
@@ -1721,6 +1728,10 @@ static inline int read_hash_entry(int alpha, int beta, int depth) {
 
 static inline int write_hash_entry(int score, int depth, int flag) {
     tt *hash_entry = &hash_table[hash_key % hash_size];
+
+    if (score < -mate_score) score -= ply;
+    if (score > mate_score) score += ply;
+
 
     hash_entry->hash_key = hash_key;
     hash_entry->score = score;
@@ -1835,6 +1846,10 @@ static inline int quiescence(int alpha, int beta) {
 
     nodes++;    
 
+    if (ply > max_ply - 1) {
+        return evaluate();
+    }
+
     int eval = evaluate();
     // fail-hard beta cutoff
     if (eval >= beta) {
@@ -1868,15 +1883,16 @@ static inline int quiescence(int alpha, int beta) {
 
         ply--;
         take_back();
-        // fail-hard beta cutoff
-        if (score >= beta) {
-            // move fails high
-            return beta;
-        } 
 
         // found a better move
         if (score > alpha) {
             alpha = score;
+        
+            // fail-hard beta cutoff
+            if (score >= beta) {
+                // move fails high
+                return beta;
+            } 
         }
     }
     return alpha;
@@ -1886,6 +1902,14 @@ const int full_depth_moves = 4;
 const int reduction_limit = 3;
 
 static inline int negamax(int alpha, int beta, int depth) {
+    int score;
+
+    int hash_flag = hash_flag_alpha;
+    if (ply && (score = read_hash_entry(alpha, beta, depth)) != no_hash_entry) {
+        return score;
+    }
+
+
     if (nodes & 2047 == 0)
         communicate();
 
@@ -1913,10 +1937,20 @@ static inline int negamax(int alpha, int beta, int depth) {
     // null move pruning
     if (depth >= 3 && !in_check && ply) {
         copy_board();
-        side ^= 1;
-        enpassant = no_sq;
 
-        int score = -negamax(-beta, -beta + 1, depth - 3);
+        ply++;
+        
+        if (enpassant != no_sq) {
+            hash_key ^= enpassant_keys[enpassant];
+        }
+        enpassant = no_sq;
+        
+        side ^= 1;
+        hash_key ^= side_key;
+
+        score = -negamax(-beta, -beta + 1, depth - 3);
+
+        ply--;
 
         take_back();
 
@@ -1951,8 +1985,6 @@ static inline int negamax(int alpha, int beta, int depth) {
 
         legal_moves++;
 
-        int score;
-
         // PVS & LMR
         if (moves_searched == 0) {
             score = -negamax(-beta, -alpha, depth-1);
@@ -1980,19 +2012,10 @@ static inline int negamax(int alpha, int beta, int depth) {
 
         moves_searched++;
 
-        // fail-hard beta cutoff
-        if (score >= beta) {
-            if (!get_move_capture(moves.moves[count]))  {
-                // remember two moves
-                killer_moves[1][ply] = killer_moves[0][ply];
-                killer_moves[0][ply] = moves.moves[count];
-            }
-            // move fails high
-            return beta;
-        }
-
         // found a better move
         if (score > alpha) {
+
+            hash_flag = hash_flag_exact;
 
             if (!get_move_capture(moves.moves[count]))  {
                 history_moves[get_move_piece(moves.moves[count])][get_move_target(moves.moves[count])] += depth;
@@ -2008,6 +2031,20 @@ static inline int negamax(int alpha, int beta, int depth) {
 
             // adjust pv length
             pv_length[ply] = pv_length[ply+1];
+
+
+            // fail-hard beta cutoff
+            if (score >= beta) {
+                write_hash_entry(beta, depth, hash_flag_beta);
+
+                if (!get_move_capture(moves.moves[count]))  {
+                    // remember two moves
+                    killer_moves[1][ply] = killer_moves[0][ply];
+                    killer_moves[0][ply] = moves.moves[count];
+                }
+                // move fails high
+                return beta;
+            }
         }
     }
 
@@ -2016,11 +2053,12 @@ static inline int negamax(int alpha, int beta, int depth) {
         if (in_check) {
             // less than -50000 for it to be in alpha beta bounds
             // add ply for it to be able to checkmate in bigger depths
-            return -49000 + ply;
+            return -mate_value + ply;
         } else {
             return 0;
         }
     }
+    write_hash_entry(alpha, depth, hash_flag);
 
     // when move fails low
     return alpha;
@@ -2040,8 +2078,8 @@ void search_position(int depth) {
     memset(pv_length, 0, sizeof(pv_length));
     memset(pv_table, 0, sizeof(pv_table));
 
-    int alpha = -50000;
-    int beta = 50000;
+    int alpha = -infinity;
+    int beta = infinity;
 
     for (int current_depth = 1; current_depth <= depth; current_depth++) {
         if (stopped)
@@ -2053,8 +2091,8 @@ void search_position(int depth) {
         score = negamax(alpha, beta, current_depth);
 
         if (score <= alpha || score >= beta) {
-            alpha = -50000;
-            beta = 50000;
+            alpha = -infinity;
+            beta = infinity;
             continue;
         }
         alpha = score - 50;
@@ -2284,6 +2322,7 @@ void uci_loop() {
         }
 
         else if (strncmp(input, "ucinewgame", 10) == 0) {
+            clear_hash_table();
             parse_position("position startpos");
         }
 
@@ -2417,6 +2456,7 @@ void init_all() {
     init_sliders_attacks(bishop);
     init_sliders_attacks(rook);
     init_random_keys();
+    clear_hash_table();
 }
 
 
@@ -2429,14 +2469,11 @@ int main() {
     if (debug) {
         parse_fen(start_position);
         print_board();
-        clear_hash_table();
-
-        write_hash_entry(21, 1, hash_flag_alpha);
-
-        int score = read_hash_entry(20, 30, 1);
-
-        printf("%d\n", score);
-        //perft_test(6);
+        search_position(10);
+        
+        make_move(pv_table[0][0], all_moves);
+        
+        search_position(10);
     } else {
         uci_loop();
     }
