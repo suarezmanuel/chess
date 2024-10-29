@@ -67,6 +67,7 @@ int char_pieces[] = {
 #define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
+#define repetitions "2r3k1/R7/8/1R6/8/8/P4KPP/8 w - - 0 40 "
 
 #define get_bit(bitboard, square) (bitboard & (1ULL << square))
 #define set_bit(bitboard, square) (bitboard |= (1ULL << square))
@@ -98,7 +99,10 @@ static inline void add_move(moves *move_list, int move) {
 char promoted_pieces[] = {[Q] = 'q', [R] = 'r', [B] = 'b', [N] = 'n', [q] = 'q', [r] = 'r', [b] = 'b', [n] = 'n'};
 
 void print_move(int move) {
-    printf("%s%s%c", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)]);
+    if (get_move_promoted(move)) 
+        printf("%s%s%c", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)], promoted_pieces[get_move_promoted(move)]);
+    else
+        printf("%s%s", square_to_coordinates[get_move_source(move)], square_to_coordinates[get_move_target(move)]);
 }
 
 void print_move_count(int move, long count) {
@@ -236,6 +240,14 @@ int castle = -1;
 
 // almost unique position identifier aka position key
 U64 hash_key = 0ULL;
+
+U64 repetition_table[1000];
+int repetition_index = 0;
+
+// half move counter
+int ply;
+
+
 
 int quit = 0;
 int movestogo = 30;
@@ -660,6 +672,9 @@ void parse_fen(char* fen) {
     side = 0;
     enpassant = no_sq;
     castle = 0;
+
+    repetition_index = 0;
+    memset(repetition_table, 0ULL, sizeof(repetition_table));
 
     for (int rank = 0; rank < 8; rank++) {
         for (int file = 0; file < 8; file++) {
@@ -1316,7 +1331,7 @@ static inline void generate_moves(moves* move_list) {
     }
 }
 
-long long int get_time_ms() {
+int get_time_ms() {
     #ifdef WIN64
         return GetTickCount();
     #else
@@ -1418,6 +1433,7 @@ void read_input() {
 
 // a bridge function to interact between search and GUI input
 static void communicate() {
+    // printf("timeset: %lld, stoptime: %lld, get_time_ms: %lld", timeset, stoptime, get_time_ms());
 	// if time is up break here
     if(timeset == 1 && get_time_ms() > stoptime) {
 		// tell engine to stop calculating
@@ -1472,7 +1488,7 @@ void perft_test(int depth) {
 
     generate_moves(&moves);
 
-    long long int start = get_time_ms();
+    int start = get_time_ms();
 
     for (int i=0; i < moves.count; i++) {
         
@@ -1498,7 +1514,7 @@ void perft_test(int depth) {
 
     printf("\n Depth: %d\n", depth);
     printf(" Nodes: %ld\n", nodes);
-    printf(" Time: %lld\n\n", get_time_ms()-start);
+    printf(" Time: %d\n\n", get_time_ms()-start);
 }
 
 // extactly matches PNBRQKpnbrqk
@@ -1591,6 +1607,73 @@ const int mirror_score[128] ={
 	a8, b8, c8, d8, e8, f8, g8, h8
 };
 
+
+U64 file_masks[64];
+U64 rank_masks[64];
+U64 isolated_masks[64];
+U64 white_passed_masks[64];
+U64 black_passed_masks[64];
+
+U64 set_file_rank(int file_number, int rank_number) {
+    // file or rank mask
+    U64 mask = 0ULL;
+
+    for (int i=0; i < 8; i++) {
+        for (int j=0; j < 8; j++) {
+            int square = i*8 + j;
+
+            if (file_number != -1) {
+                if (j == file_number)
+                    set_bit(mask, square);     
+            } else if (rank_number != -1) {
+                if (i == rank_number)
+                    set_bit(mask, square);
+            }
+        }
+    }
+
+    return mask;
+}
+
+void initialize_evaluation_masks() {
+    // for (int i=0; i < 8; i++) {
+    //     for (int j=0; j < 8; j++) {
+    //         file_masks[i*8+j] = set_file_rank(j, -1);
+    //         rank_masks[i*8+j] = set_file_rank(-1, i);
+    //     }   
+    // }     
+
+    // for (int i=0; i < 8; i++) {
+    //     for (int j=0; j < 8; j++) {
+    //         isolated_masks[i*8+j] |= set_file_rank(i-1, -1);
+    //         isolated_masks[i*8+j] |= set_file_rank(i+1, -1);
+    //     }   
+    // }       
+
+//   for (int i=0; i < 8; i++) {
+//         for (int j=0; j < 8; j++) {
+//             black_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
+//             black_passed_masks[i*8+j] |= set_file_rank(j, -1);
+//             black_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
+
+//             black_passed_masks[i*8+j] <<= 8*(j+2);
+
+//         }   
+//     }      
+
+    // for (int i=0; i < 8; i++) {
+    //     for (int j=0; j < 8; j++) {
+    //         black_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
+    //         black_passed_masks[i*8+j] |= set_file_rank(j, -1);
+    //         black_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
+
+    //         black_passed_masks[i*8+j] <<= 8*(8-j);
+
+    //     }   
+    // }      
+    // print_bitboard(black_passed_masks[a2]);
+}                      
+
 static inline int evaluate() {
 
     int score = 0;
@@ -1632,6 +1715,7 @@ static inline int evaluate() {
     return (side == white) ? score : -score;
 }
 
+
 #define infinity 50000
 #define mate_value 49000
 #define mate_score 48000
@@ -1663,9 +1747,6 @@ int pv_length[max_ply];
 int pv_table[max_ply][max_ply];
 
 int follow_pv, score_pv;
-
-// half move counter
-int ply;
 
 
 // hash table size
@@ -1840,11 +1921,22 @@ static inline int sort_moves(moves* moves) {
     }
 }
 
+
+static inline int is_repetition() {
+    for (int i = 0; i < repetition_index; i++) {
+        if (repetition_table[i] == hash_key) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}    
+
 static inline int quiescence(int alpha, int beta) {
-    if (nodes & 2047 == 0)
+    if ((nodes & 2047) == 0)
         communicate();
 
-    nodes++;    
+    nodes++;   
 
     if (ply > max_ply - 1) {
         return evaluate();
@@ -1873,16 +1965,29 @@ static inline int quiescence(int alpha, int beta) {
 
         ply++;
 
+        repetition_index++;
+        repetition_table[repetition_index] = hash_key;
+
+
         if (make_move(moves.moves[count], only_captures) == 0) {
             // if make move is illegal
             ply--;
+
+            repetition_index--;
+            
             continue;
         }
 
         int score = -quiescence(-beta, -alpha);
 
         ply--;
+
+        repetition_index--;
+
         take_back();
+
+        // reutrn 0 if time is up
+        if(stopped == 1) return 0;
 
         // found a better move
         if (score > alpha) {
@@ -1905,12 +2010,17 @@ static inline int negamax(int alpha, int beta, int depth) {
     int score;
 
     int hash_flag = hash_flag_alpha;
-    if (ply && (score = read_hash_entry(alpha, beta, depth)) != no_hash_entry) {
+
+    if (ply && is_repetition()) {
+        return 0;
+    }
+    int pv_node = ((beta-alpha) > 1);
+    if (ply && (score = read_hash_entry(alpha, beta, depth)) != no_hash_entry && !pv_node) {
         return score;
     }
 
 
-    if (nodes & 2047 == 0)
+    if ((nodes & 2047) == 0)
         communicate();
 
     // init pv length
@@ -1939,6 +2049,10 @@ static inline int negamax(int alpha, int beta, int depth) {
         copy_board();
 
         ply++;
+
+        repetition_index++;
+        repetition_table[repetition_index] = hash_key;
+
         
         if (enpassant != no_sq) {
             hash_key ^= enpassant_keys[enpassant];
@@ -1952,9 +2066,13 @@ static inline int negamax(int alpha, int beta, int depth) {
 
         ply--;
 
+        repetition_index--;
+
         take_back();
 
-        if(stopped == 1) return 0;
+        if(stopped == 1) {
+            return 0;
+        }
 
         if (score >= beta) 
             return beta;
@@ -1977,9 +2095,16 @@ static inline int negamax(int alpha, int beta, int depth) {
 
         ply++;
 
+        repetition_index++;
+        repetition_table[repetition_index] = hash_key;
+
+
         if (make_move(moves.moves[count], all_moves) == 0) {
             // if make move is illegal
             ply--;
+
+            repetition_index--;
+
             continue;
         }
 
@@ -2008,7 +2133,14 @@ static inline int negamax(int alpha, int beta, int depth) {
         }
         
         ply--;
+
+        repetition_index--;
+
         take_back();
+
+        if(stopped == 1) {
+            return 0;
+        }
 
         moves_searched++;
 
@@ -2085,7 +2217,6 @@ void search_position(int depth) {
         if (stopped)
             break;
 
-
         follow_pv = 1;
 
         score = negamax(alpha, beta, current_depth);
@@ -2098,7 +2229,15 @@ void search_position(int depth) {
         alpha = score - 50;
         beta = score + 50;
 
-        printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
+        if (score > -mate_value && score < -mate_score)
+            printf("info score mate %d depth %d nodes %ld time %d pv ", -(score + mate_value) / 2 - 1, current_depth, nodes, get_time_ms() - starttime);
+        
+        else if (score > mate_score && score < mate_value)
+            printf("info score mate %d depth %d nodes %ld time %d pv ", (mate_value - score) / 2 + 1, current_depth, nodes, get_time_ms() - starttime);   
+        
+        else
+            printf("info score cp %d depth %d nodes %ld time %d pv ", score, current_depth, nodes, get_time_ms() - starttime);
+
 
         for (int count=0; count < pv_length[0]; count++) {
             print_move(pv_table[0][count]);
@@ -2155,52 +2294,78 @@ int parse_move(char* move_string) {
 }
 
 void parse_position(char *command) {
-
-    // position is 8 chars long, move to next string
+    // shift pointer to the right where next token begins
     command += 9;
-
+    
+    // init pointer to the current character in the command string
     char *current_char = command;
-
-    // parse startpos
-    if (strncmp(command, "startpos", 8) == 0) 
+    
+    // parse UCI "startpos" command
+    if (strncmp(command, "startpos", 8) == 0)
+        // init chess board with start position
         parse_fen(start_position);
-    else {
-        printf("%s\n", current_char);
-
+    
+    // parse UCI "fen" command 
+    else
+    {
+        // make sure "fen" command is available within command string
         current_char = strstr(command, "fen");
-
-        // if no fen present in command
-        if (current_char == NULL) {
+        
+        // if no "fen" command is available within command string
+        if (current_char == NULL)
+            // init chess board with start position
             parse_fen(start_position);
-        } else {
-            // fen is 3 chars long, move to next string
+            
+        // found "fen" substring
+        else
+        {
+            // shift pointer to the right where next token begins
             current_char += 4;
-
+            
+            // init chess board with position from FEN string
             parse_fen(current_char);
         }
     }
-
+    
+    // parse moves after position
     current_char = strstr(command, "moves");
-
-    if (current_char != NULL) {
-        // moves is 5 chars long
+    
+    // moves available
+    if (current_char != NULL)
+    {
+        // shift pointer to the right where next token begins
         current_char += 6;
-
-        while (*current_char) {
-
+        
+        // loop over moves within a move string
+        while(*current_char)
+        {
+            // parse next move
             int move = parse_move(current_char);
-
-            if (move == 0) {
+            
+            // if no more moves
+            if (move == 0)
+                // break out of the loop
                 break;
-            }
-
+            
+            // increment repetition index
+            repetition_index++;
+            
+            // wtire hash key into a repetition table
+            repetition_table[repetition_index] = hash_key;
+            
+            // make move on the chess board
             make_move(move, all_moves);
-            // each move is 4 chars long
-            current_char += 5;
-        }
+            
+            // move current character mointer to the end of current move
+            while (*current_char && *current_char != ' ') current_char++;
+            
+            // go to the next move
+            current_char++;
+        }        
     }
-    print_board();
-    // printf("%s\n", current_char);
+    
+    // print board
+    // print_board();
 }
 
 void parse_go(char *command) {
@@ -2288,6 +2453,7 @@ void parse_go(char *command) {
     // search position
     search_position(depth);
 }
+
 void uci_loop() {
     // reset stdin, stdout
     setbuf(stdin, NULL);
@@ -2319,11 +2485,12 @@ void uci_loop() {
 
         else if (strncmp(input, "position", 8) == 0) {
             parse_position(input);
+            clear_hash_table(); 
         }
 
         else if (strncmp(input, "ucinewgame", 10) == 0) {
-            clear_hash_table();
             parse_position("position startpos");
+            clear_hash_table();
         }
 
         else if (strncmp(input, "go", 2) == 0) {
@@ -2457,6 +2624,7 @@ void init_all() {
     init_sliders_attacks(rook);
     init_random_keys();
     clear_hash_table();
+    // initialize_evaluation_masks();
 }
 
 
@@ -2464,16 +2632,14 @@ int main() {
     // init all
     init_all();
     
-    int debug = 1;
+    int debug = 0;
 
+    // printf("move: %d", encode_move(d5, e5, k,0,0,0,0,0));
     if (debug) {
-        parse_fen(start_position);
-        print_board();
-        search_position(10);
-        
-        make_move(pv_table[0][0], all_moves);
-        
-        search_position(10);
+        parse_fen("r1bqkb1r/pp2pppp/2n2n2/2pp4/4N3/3P1N2/PPP1PPPP/R1BQKB1R b KQkq - 0 5");
+        // print_board();
+        parse_go("go movetime 2000");
+        // search_position(14);
     } else {
         uci_loop();
     }
