@@ -1444,7 +1444,7 @@ static void communicate() {
 	read_input();
 }
 
-long nodes = 0;
+U64 nodes = 0;
 long local_nodes = 0;
 
 static inline void perft_driver(int depth) {
@@ -1513,7 +1513,7 @@ void perft_test(int depth) {
     }
 
     printf("\n Depth: %d\n", depth);
-    printf(" Nodes: %ld\n", nodes);
+    printf(" Nodes: %lld\n", nodes);
     printf(" Time: %d\n\n", get_time_ms()-start);
 }
 
@@ -1614,6 +1614,28 @@ U64 isolated_masks[64];
 U64 white_passed_masks[64];
 U64 black_passed_masks[64];
 
+const int get_rank[64] = {
+    7, 7, 7, 7, 7, 7, 7, 7,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    3, 3, 3, 3, 3, 3, 3, 3,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+const int double_pawn_penalty = -10;
+const int isolated_pawn_penalty = -10;
+
+const int passed_pawn_bonus[8] = { 0, 10, 30, 50, 75, 100, 150, 200 }; 
+
+const int semi_open_file_score = 10;
+
+const int open_file_score = 15;
+
+const int king_shield_bonus = 5;
+
 U64 set_file_rank(int file_number, int rank_number) {
     // file or rank mask
     U64 mask = 0ULL;
@@ -1636,42 +1658,39 @@ U64 set_file_rank(int file_number, int rank_number) {
 }
 
 void initialize_evaluation_masks() {
-    // for (int i=0; i < 8; i++) {
-    //     for (int j=0; j < 8; j++) {
-    //         file_masks[i*8+j] = set_file_rank(j, -1);
-    //         rank_masks[i*8+j] = set_file_rank(-1, i);
-    //     }   
-    // }     
+    for (int i=0; i < 8; i++) {
+        for (int j=0; j < 8; j++) {
+            file_masks[i*8+j] = set_file_rank(j, -1);
+            rank_masks[i*8+j] = set_file_rank(-1, i);
+        }   
+    }     
 
-    // for (int i=0; i < 8; i++) {
-    //     for (int j=0; j < 8; j++) {
-    //         isolated_masks[i*8+j] |= set_file_rank(i-1, -1);
-    //         isolated_masks[i*8+j] |= set_file_rank(i+1, -1);
-    //     }   
-    // }       
+    for (int i=0; i < 8; i++) {
+        for (int j=0; j < 8; j++) {
+            isolated_masks[i*8+j] |= set_file_rank(j-1, -1);
+            isolated_masks[i*8+j] |= set_file_rank(j+1, -1);
+        }   
+    }       
 
-//   for (int i=0; i < 8; i++) {
-//         for (int j=0; j < 8; j++) {
-//             black_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
-//             black_passed_masks[i*8+j] |= set_file_rank(j, -1);
-//             black_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
+  for (int i=0; i < 8; i++) {
+        for (int j=0; j < 8; j++) {
+            white_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
+            white_passed_masks[i*8+j] |= set_file_rank(j, -1);
+            white_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
 
-//             black_passed_masks[i*8+j] <<= 8*(j+2);
+            white_passed_masks[i*8+j] >>= 8*(8-i);
+        }   
+    }      
 
-//         }   
-//     }      
+    for (int i=0; i < 8; i++) {
+        for (int j=0; j < 8; j++) {
+            black_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
+            black_passed_masks[i*8+j] |= set_file_rank(j, -1);
+            black_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
 
-    // for (int i=0; i < 8; i++) {
-    //     for (int j=0; j < 8; j++) {
-    //         black_passed_masks[i*8+j] |= set_file_rank(j-1, -1);
-    //         black_passed_masks[i*8+j] |= set_file_rank(j, -1);
-    //         black_passed_masks[i*8+j] |= set_file_rank(j+1, -1);
-
-    //         black_passed_masks[i*8+j] <<= 8*(8-j);
-
-    //     }   
-    // }      
-    // print_bitboard(black_passed_masks[a2]);
+            black_passed_masks[i*8+j] <<= 8*(i+1);
+        }   
+    }      
 }                      
 
 static inline int evaluate() {
@@ -1693,19 +1712,117 @@ static inline int evaluate() {
             square = get_lsb1_index(bitboard);
 
             score += material_score[piece];
+
+            int double_pawns;
             
             switch(piece) {
-                case P: score += pawn_score[square]; break;
-                case N: score += knight_score[square]; break;
-                case B: score += bishop_score[square]; break;
-                case R: score += rook_score[square]; break;
-                case K: score += king_score[square]; break;
+                case P: 
+                    score += pawn_score[square];
+                    // double pawn penalty
+                    double_pawns = count_bits(bitboards[P] & file_masks[square]);
+                    if (double_pawns > 1)
+                        // penalty is negative
+                        score += double_pawns * double_pawn_penalty;
 
-                case p: score -= pawn_score[mirror_score[square]]; break;
+                    if ((bitboards[P] & isolated_masks[square]) == 0)
+                        score += isolated_pawn_penalty;
+
+                    if ((white_passed_masks[square] & bitboards[p]) == 0) {
+                        score += passed_pawn_bonus[get_rank[square]];
+                    }
+
+                    break;
+                case N: score += knight_score[square]; break;
+                case B: 
+                    score += bishop_score[square];
+                    
+                    score += count_bits(get_bishop_attacks(square, occupancies[both]));
+
+                    break;
+                case R: 
+                    score += rook_score[square];
+                    
+                    // if no pawns of our color
+                    if ((bitboards[P] & file_masks[square]) == 0)
+                        score += semi_open_file_score;
+
+                    // if no pawns at all
+                    if (((bitboards[P] | bitboards[p]) & file_masks[square]) == 0)
+                        score += open_file_score;
+
+                    break;
+
+                case Q:
+                    score += count_bits(get_queen_attacks(square, occupancies[both]));
+                    break;
+                    
+                case K: 
+                    // positional score
+                    score += king_score[square]; 
+
+                    // if no pawns of our color
+                    if (bitboards[P] & file_masks[square] == 0)
+                        score -= semi_open_file_score;
+
+                    // if no pawns at all
+                    if ((bitboards[P] | bitboards[p]) & file_masks[square] == 0)
+                        score -= open_file_score;
+
+                    score += count_bits(king_attacks[square] & occupancies[white]) * king_shield_bonus;
+                    
+                    break;
+
+                case p: 
+                    score -= pawn_score[mirror_score[square]];
+                    // double pawn penalty
+                    double_pawns = count_bits(bitboards[p] & file_masks[square]);
+                    if (double_pawns > 1)
+                        // penalty is negative
+                        score -= double_pawns * double_pawn_penalty;
+
+                    if ((bitboards[p] & isolated_masks[square]) == 0)
+                        score -= isolated_pawn_penalty;
+
+                    if ((black_passed_masks[square] & bitboards[P]) == 0) {
+                        score -= passed_pawn_bonus[get_rank[mirror_score[square]]];
+                    }
+
+                    break;
                 case n: score -= knight_score[mirror_score[square]]; break;
-                case b: score -= bishop_score[mirror_score[square]]; break;
-                case r: score -= rook_score[mirror_score[square]]; break;
-                case k: score -= king_score[mirror_score[square]]; break;
+                case b: 
+                    score -= bishop_score[mirror_score[square]]; 
+                    score -= count_bits(get_bishop_attacks(square, occupancies[both]));
+                    break;
+                case r:
+                    score -= rook_score[mirror_score[square]];
+
+                    // if no pawns of our color
+                    if ((bitboards[p] & file_masks[square]) == 0)
+                        score -= semi_open_file_score;
+
+                    // if no pawns at all
+                    if (((bitboards[P] | bitboards[p]) & file_masks[square]) == 0)
+                        score -= open_file_score;
+
+                    break;
+
+                case q:
+                    score -= count_bits(get_queen_attacks(square, occupancies[both]));
+                    break;
+                case k: 
+                    score -= king_score[mirror_score[square]]; 
+
+                    // if no pawns of our color
+                    if (bitboards[P] & file_masks[square] == 0)
+                        score += semi_open_file_score;
+
+                    // if no pawns at all
+                    if ((bitboards[P] | bitboards[p]) & file_masks[square] == 0)
+                        score += open_file_score;
+
+                    score -= count_bits(king_attacks[square] & occupancies[black]) * king_shield_bonus;
+                    
+                    break;
             }
 
             pop_bit(bitboard, square);
@@ -1750,7 +1867,7 @@ int follow_pv, score_pv;
 
 
 // hash table size
-#define hash_size 0x400000
+#define hash_size 800000
 
 #define no_hash_entry 100000
 
@@ -2230,13 +2347,13 @@ void search_position(int depth) {
         beta = score + 50;
 
         if (score > -mate_value && score < -mate_score)
-            printf("info score mate %d depth %d nodes %ld time %d pv ", -(score + mate_value) / 2 - 1, current_depth, nodes, get_time_ms() - starttime);
+            printf("info score mate %d depth %d nodes %lld time %d pv ", -(score + mate_value) / 2 - 1, current_depth, nodes, get_time_ms() - starttime);
         
         else if (score > mate_score && score < mate_value)
-            printf("info score mate %d depth %d nodes %ld time %d pv ", (mate_value - score) / 2 + 1, current_depth, nodes, get_time_ms() - starttime);   
+            printf("info score mate %d depth %d nodes %lld time %d pv ", (mate_value - score) / 2 + 1, current_depth, nodes, get_time_ms() - starttime);   
         
         else
-            printf("info score cp %d depth %d nodes %ld time %d pv ", score, current_depth, nodes, get_time_ms() - starttime);
+            printf("info score cp %d depth %d nodes %lld time %d pv ", score, current_depth, nodes, get_time_ms() - starttime);
 
 
         for (int count=0; count < pv_length[0]; count++) {
@@ -2437,7 +2554,7 @@ void parse_go(char *command) {
 
         // set up timing
         time /= movestogo;
-        time -= 50;
+        if (time > 1500) time -= 50;
         stoptime = starttime + time + inc;
     }
 
@@ -2624,22 +2741,21 @@ void init_all() {
     init_sliders_attacks(rook);
     init_random_keys();
     clear_hash_table();
-    // initialize_evaluation_masks();
+    initialize_evaluation_masks();
 }
 
 
 int main() {
     // init all
-    init_all();
+    init_all(); 
     
     int debug = 0;
 
     // printf("move: %d", encode_move(d5, e5, k,0,0,0,0,0));
     if (debug) {
-        parse_fen("r1bqkb1r/pp2pppp/2n2n2/2pp4/4N3/3P1N2/PPP1PPPP/R1BQKB1R b KQkq - 0 5");
-        // print_board();
-        parse_go("go movetime 2000");
-        // search_position(14);
+        parse_fen("6k1/ppppprbp/8/8/8/8/PPPPPRBP/6K1 w - - ");
+        print_board();
+        printf("score: %d\n", evaluate());
     } else {
         uci_loop();
     }
