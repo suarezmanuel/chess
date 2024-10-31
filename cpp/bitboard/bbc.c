@@ -246,7 +246,7 @@ int repetition_index = 0;
 
 // half move counter
 int ply;
-
+int half_moves = 0;
 
 
 int quit = 0;
@@ -734,8 +734,33 @@ void parse_fen(char* fen) {
         enpassant = rank*8 + file;
     } else {
         enpassant = no_sq;
+        fen++;
     }
 
+     // Parse halfmove clock
+    while (*fen == ' ') fen++;
+    int halfmove_clock = 0;
+    while (*fen >= '0' && *fen <= '9') {
+        halfmove_clock = halfmove_clock * 10 + (*fen - '0');
+        fen++;
+    }
+
+    // Parse fullmove number
+    while (*fen == ' ') fen++;
+    int fullmove_number = 0;
+    while (*fen >= '0' && *fen <= '9') {
+        fullmove_number = fullmove_number * 10 + (*fen - '0');
+        fen++;
+    }
+
+    // Calculate ply
+    if (side == white) {
+        ply = (fullmove_number - 1) * 2;
+    } else {
+        ply = (fullmove_number - 1) * 2 + 1;
+    }
+
+    // fifty_move = halfmove_clock;
 
     for (int piece = P; piece <= K; piece++) {
         occupancies[white] |= bitboards[piece];
@@ -2450,6 +2475,7 @@ void parse_position(char *command) {
     // moves available
     if (current_char != NULL)
     {
+        half_moves = 0;
         // shift pointer to the right where next token begins
         current_char += 6;
         
@@ -2472,7 +2498,7 @@ void parse_position(char *command) {
             
             // make move on the chess board
             make_move(move, all_moves);
-            
+            half_moves++;
             // move current character mointer to the end of current move
             while (*current_char && *current_char != ' ') current_char++;
             
@@ -2485,7 +2511,13 @@ void parse_position(char *command) {
     // print_board();
 }
 
+float get_movestogo(int ply_count) {
+    return 59.3 + (72830 - 2330 * ply_count) / (2644 + ply_count * (10 + ply_count));
+}
+
 void parse_go(char *command) {
+
+    // printf("%s\n", command);
     // init parameters
     int depth = -1;
 
@@ -2531,7 +2563,7 @@ void parse_go(char *command) {
         depth = atoi(argument + 6);
 
     // if move time is not available
-    if(movetime != -1)
+    if(time == -1 && movetime != -1)
     {
         // set time equal to move time
         time = movetime;
@@ -2545,15 +2577,26 @@ void parse_go(char *command) {
 
     // init search depth
     depth = depth;
-
+    // printf("ply count: %d\n", half_moves);
+    // printf("moves to go: %d\n", movestogo);
     // if time control is available
     if(time != -1)
     {
         // flag we're playing with time control
         timeset = 1;
-
+        // convert half moves into full moves
+        if (movetime != -1) {
+            movestogo = 4;
+            movetime = -1;
+        }
+        else
+            movestogo = get_movestogo(half_moves)/2;
+        printf("ply count: %d\n", half_moves);
+        printf("moves to go: %d\n", movestogo);
+        printf("time: %d\n", time);
         // set up timing
         time /= movestogo;
+        printf("time: %d\n", time);
         if (time > 1500) time -= 50;
         stoptime = starttime + time + inc;
     }
@@ -2592,6 +2635,8 @@ void uci_loop() {
         // get user input from stdin
         if (!fgets(input, 2000, stdin))
             continue;
+
+        // printf("%s\n", input);
 
         if (input[0] == '\n')
             continue;
@@ -2754,8 +2799,12 @@ int main() {
     // printf("move: %d", encode_move(d5, e5, k,0,0,0,0,0));
     if (debug) {
         parse_fen("6k1/ppppprbp/8/8/8/8/PPPPPRBP/6K1 w - - ");
-        print_board();
-        printf("score: %d\n", evaluate());
+        // print_board();
+        printf("%f\n", get_movestogo(0));
+        printf("%f\n", get_movestogo(10));
+        printf("%f\n", get_movestogo(20));
+        printf("%f\n", get_movestogo(30));
+        // printf("score: %d\n", evaluate());
     } else {
         uci_loop();
     }
