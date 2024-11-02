@@ -58,6 +58,8 @@
         "chrono": "cpp",
         "ratio": "cpp",
         "fstream": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "unistd.h": "c",
+        "time.h": "c"
     }
 }
