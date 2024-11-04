@@ -1,4 +1,6 @@
-#include "bbc.c"
+// #include "bbc.h"
+#include "magic.h"
+// #include "board.h"
 
 unsigned int state = 1804289383;
 
@@ -87,3 +89,24 @@ void init_magic_numbers() {
     //     printf(" 0x%llxULL,\n", find_magic_number(square, bishop_relevant_bits[square], bishop)); 
     // }
 }
+
+void init_random_keys() {
+    
+    state = 1804289383;
+
+    for (int pp = P; pp <= k; pp++) {
+        for (int square = 0; square < 64; square++) {
+            piece_keys[pp][square] = get_random_U64_number();
+        }
+    } 
+
+    for (int square = 0; square < 64; square++) {
+        enpassant_keys[square] = get_random_U64_number();
+    }
+
+    for (int i = 0; i < 16; i++) {
+        castle_keys[i] = get_random_U64_number();
+    }   
+
+    side_key = get_random_U64_number();
+} 

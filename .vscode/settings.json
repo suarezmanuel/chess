@@ -60,6 +60,14 @@
         "fstream": "cpp",
         "codecvt": "cpp",
         "unistd.h": "c",
-        "time.h": "c"
+        "time.h": "c",
+        "bbc.h": "c",
+        "board.h": "c",
+        "stdlib.h": "c",
+        "time_controls.h": "c",
+        "search.h": "c",
+        "evaluation.h": "c",
+        "main.h": "c",
+        "perft.h": "c"
     }
 }
