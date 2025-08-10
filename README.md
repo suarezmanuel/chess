@@ -1,4 +1,4 @@
-#lichess link https://lichess.org/@/hemichess
+# lichess link https://lichess.org/@/hemichess
 
 # whats this?
 
