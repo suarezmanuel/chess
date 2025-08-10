@@ -1,3 +1,5 @@
+#lichess link https://lichess.org/@/hemichess
+
 # whats this?
 
 a chess platform coded mainly in cpp and js, that heavily resembles chess.com, served to a web page via nodejs and ngrok, using the performance gains of compiling cpp into wasm.
